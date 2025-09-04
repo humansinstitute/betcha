@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Betcha - Capture The Flag</title>
     <style>
         /* Reset and base styles */
@@ -339,15 +339,7 @@
         }
         
         /* Flag capture button states */
-        .btn.flag-holder {
-            background: #ffc107 !important;
-            color: #212529 !important;
-            cursor: not-allowed !important;
-        }
-        
-        .btn.flag-holder:hover {
-            background: #e0a800 !important;
-        }
+        /* Removed .flag-holder button styles - button stays consistent now */
         
         /* Timer display colors */
         #game-timer {
@@ -635,10 +627,89 @@
             font-style: italic;
         }
 
+        /* Winner announcement countdown overlay */
+        .countdown-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(102, 126, 234, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .countdown-content {
+            text-align: center;
+            color: white;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .countdown-content h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.8rem;
+            color: #fff;
+        }
+
+        .countdown-content p {
+            margin: 0 0 15px 0;
+            font-size: 1.1rem;
+            color: #e2e8f0;
+        }
+
+        .countdown-number {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            margin: 20px 0;
+            animation: countdownPulse 1s ease-in-out infinite;
+        }
+
+        .countdown-subtitle {
+            font-size: 0.9rem !important;
+            color: #cbd5e0 !important;
+            font-style: italic;
+        }
+
+        @keyframes countdownPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Make sure endgame container is positioned for overlay */
+        #endgame-screen .container {
+            position: relative;
+        }
+
         /* Mobile enhancements for end game */
         @media (max-width: 768px) {
             .celebration-icon {
                 font-size: 4rem;
+            }
+
+            .countdown-content {
+                padding: 30px 20px;
+                margin: 20px;
+            }
+
+            .countdown-content h2 {
+                font-size: 1.4rem;
+            }
+
+            .countdown-number {
+                font-size: 3rem;
+            }
+
+            .countdown-content p {
+                font-size: 1rem;
             }
             
             .celebration-text {
@@ -813,6 +884,16 @@
                 <h1>🎉 Game Complete!</h1>
             </div>
             
+            <!-- Winner announcement countdown overlay -->
+            <div id="winner-countdown" class="countdown-overlay hidden">
+                <div class="countdown-content">
+                    <h2>⏰ Finalizing Results...</h2>
+                    <p>Announcing winner in</p>
+                    <div class="countdown-number" id="countdown-display">5</div>
+                    <p class="countdown-subtitle">Ensuring all data is synchronized</p>
+                </div>
+            </div>
+            
             <div class="status success">
                 <h2>🏆 Winner: <span id="final-winner"></span></h2>
                 <p>Prize Status: <span id="prize-status">Sending...</span></p>
@@ -863,6 +944,10 @@
                 this.currentLeaderboard = [];
                 this.gameTimer = null;
                 this.qrCodeGenerated = false;
+                
+                // Concurrent operation tracking - prevent multiple simultaneous operations
+                this.isFlagCaptureInProgress = false;
+                this.isGameStateUpdateInProgress = false;
                 this.gameplayStarted = false;
                 this.prizeDistributor = null;
                 
@@ -1737,27 +1822,46 @@
                 }
             }
             
-            async setGameStateWithRetry(gameID, gameState, maxRetries = 3) {
-                for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                    try {
-                        console.log(`Attempt ${attempt}/${maxRetries} to set game state`);
-                        const result = await nostrKVClient.setGameState(gameID, gameState);
-                        console.log('Successfully saved game state');
-                        return result;
-                    } catch (error) {
-                        if (error.message.includes('Rate limit exceeded')) {
-                            const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
-                            console.log(`Rate limit hit, waiting ${delay}ms before retry ${attempt}/${maxRetries}`);
-                            
-                            if (attempt < maxRetries) {
-                                await new Promise(resolve => setTimeout(resolve, delay));
+            async setGameStateWithRetry(gameID, gameState, maxRetries = 2) {
+                // CONCURRENT OPERATION GUARD: Prevent multiple simultaneous game state updates  
+                if (this.isGameStateUpdateInProgress) {
+                    console.log('🚫 Game state update already in progress - skipping to prevent conflicts');
+                    throw new Error('Game state update already in progress');
+                }
+                
+                this.isGameStateUpdateInProgress = true;
+                
+                try {
+                    // Reduced retries and made fail-fast for rapid interactions
+                    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                        try {
+                            console.log(`Attempt ${attempt}/${maxRetries} to set game state`);
+                            const result = await nostrKVClient.setGameState(gameID, gameState);
+                            console.log('Successfully saved game state');
+                            return result;
+                        } catch (error) {
+                            if (error.message.includes('Rate limit exceeded')) {
+                                // FAIL FAST: Don't queue up rate-limited requests
+                                console.log('🚫 Rate limit hit - failing fast to prevent queue buildup');
+                                throw new Error('Server busy - operation failed');
+                            } else if (error.message.includes('timeout')) {
+                                // Only retry once for timeouts, with minimal delay
+                                if (attempt < maxRetries) {
+                                    const shortDelay = 750; // Very short delay - 750ms only
+                                    console.log(`Timeout, quick retry in ${shortDelay}ms (${attempt}/${maxRetries})`);
+                                    await new Promise(resolve => setTimeout(resolve, shortDelay));
+                                } else {
+                                    throw new Error('Connection timeout - operation failed');
+                                }
                             } else {
-                                throw new Error('Unable to save game state after multiple retries due to rate limiting');
+                                // For other errors, don't retry - fail immediately  
+                                throw error;
                             }
-                        } else {
-                            throw error;
                         }
                     }
+                } finally {
+                    // CRITICAL: Always release the game state update lock
+                    this.isGameStateUpdateInProgress = false;
                 }
             }
             
@@ -1870,12 +1974,10 @@
                     if (remaining <= 0) {
                         this.stopGameTimer();
                         this.updateTimerDisplay(0); // Ensure timer shows 00:00
-                        console.log('⏰ Timer expired, ending game...');
-                        // Give a moment for any final updates to sync before showing results
-                        setTimeout(() => {
-                            console.log('⏰ Executing endGame after delay...');
-                            this.endGame();
-                        }, 1000);
+                        console.log('⏰ Timer expired, starting winner announcement countdown...');
+                        // Show endgame screen immediately but with countdown overlay
+                        this.showScreen('endgame-screen');
+                        this.startWinnerCountdown();
                     }
                 }, 1000); // Update every second
             }
@@ -1885,6 +1987,40 @@
                     clearInterval(this.gameTimer);
                     this.gameTimer = null;
                 }
+            }
+            
+            startWinnerCountdown() {
+                console.log('🎯 Starting winner announcement countdown...');
+                
+                // Show countdown overlay
+                const countdownOverlay = document.getElementById('winner-countdown');
+                const countdownDisplay = document.getElementById('countdown-display');
+                
+                if (countdownOverlay) {
+                    countdownOverlay.classList.remove('hidden');
+                }
+                
+                let timeLeft = 5;
+                countdownDisplay.textContent = timeLeft;
+                
+                const countdownTimer = setInterval(() => {
+                    timeLeft--;
+                    if (timeLeft > 0) {
+                        countdownDisplay.textContent = timeLeft;
+                        console.log(`🎯 Countdown: ${timeLeft}`);
+                    } else {
+                        clearInterval(countdownTimer);
+                        console.log('🎯 Countdown complete, processing game results...');
+                        
+                        // Hide countdown overlay
+                        if (countdownOverlay) {
+                            countdownOverlay.classList.add('hidden');
+                        }
+                        
+                        // Now execute endGame to finalize results
+                        this.endGame();
+                    }
+                }, 1000);
             }
             
             updateTimerDisplay(remaining) {
@@ -1912,39 +2048,92 @@
                     this.stopGameplayPolling();
                     this.gameplayStarted = false; // Reset for next game
                     
-                    console.log('🏁 Current game state:', this.currentGameState?.state);
-                    const gameState = this.currentGameState;
-                    if (!gameState || gameState.state !== 'in_progress') {
-                        console.log('🏁 Game state invalid for ending:', gameState?.state);
+                    // Get the latest game state to check if game was already ended by another client
+                    console.log('🏁 Fetching latest game state to check if already completed...');
+                    const latestGameState = await nostrKVClient.getGameState(this.gameID);
+                    
+                    if (!latestGameState) {
+                        console.log('🏁 No game state found');
                         return;
                     }
+                    
+                    // If game is already completed, just show the results
+                    if (latestGameState.state === 'completed') {
+                        console.log('🏁 Game already completed by another client, showing results');
+                        this.currentGameState = latestGameState;
+                        this.showGameResults();
+                        return;
+                    }
+                    
+                    console.log('🏁 Current game state:', latestGameState?.state);
+                    if (latestGameState.state !== 'in_progress') {
+                        console.log('🏁 Game state invalid for ending:', latestGameState?.state);
+                        return;
+                    }
+                    
+                    const gameState = latestGameState;
                     
                     // Set game state to completed
                     gameState.state = 'completed';
                     gameState.completedAt = Date.now();
                     
-                    // Determine winner using multiple sources for reliability (same logic as showGameResults)
+                    // Determine winner using authoritative approach - prioritize the most recent flag holder
                     let winner = null;
+                    let winnerSource = 'none';
                     
-                    // First try to get from NostrKV flag holder key
+                    // Create a comprehensive list of potential winners with timestamps
+                    const potentialWinners = [];
+                    
+                    // Add from NostrKV flag holder (most authoritative)
                     try {
                         const finalFlagHolder = await nostrKVClient.getFlagHolder(this.gameID);
-                        if (finalFlagHolder) {
-                            winner = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
-                            console.log('🏁 Found winner from NostrKV flag holder:', winner);
+                        if (finalFlagHolder && finalFlagHolder.timestamp) {
+                            const winnerCandidate = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
+                            if (winnerCandidate) {
+                                potentialWinners.push({
+                                    player: winnerCandidate,
+                                    timestamp: finalFlagHolder.timestamp,
+                                    source: 'nostrKV'
+                                });
+                            }
                         }
                     } catch (error) {
                         console.warn('Could not get final flag holder from NostrKV:', error);
                     }
                     
-                    // If no winner from NostrKV, check flag holder history as backup
-                    if (!winner && gameState.flagHolderHistory && gameState.flagHolderHistory.length > 0) {
-                        const finalFlagHolder = gameState.flagHolderHistory[0]; // Most recent holder
-                        winner = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
-                        console.log('🏁 Found winner from flag holder history:', winner);
+                    // Add from flag holder history as backup
+                    if (gameState.flagHolderHistory && gameState.flagHolderHistory.length > 0) {
+                        gameState.flagHolderHistory.forEach((holder, index) => {
+                            const winnerCandidate = gameState.players.find(p => p.uuid === holder.playerUUID);
+                            if (winnerCandidate && holder.timestamp) {
+                                potentialWinners.push({
+                                    player: winnerCandidate,
+                                    timestamp: holder.timestamp,
+                                    source: `history_${index}`
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Choose winner based on most recent timestamp (closest to game end)
+                    if (potentialWinners.length > 0) {
+                        // Sort by timestamp descending (most recent first)
+                        potentialWinners.sort((a, b) => b.timestamp - a.timestamp);
+                        const selectedWinner = potentialWinners[0];
+                        winner = selectedWinner.player;
+                        winnerSource = selectedWinner.source;
+                        
+                        console.log('🏁 Winner determination:');
+                        console.log('🏁 - Candidates found:', potentialWinners.length);
+                        potentialWinners.forEach((pw, idx) => {
+                            console.log(`🏁   ${idx + 1}. ${pw.player.name} (${pw.source}) at ${new Date(pw.timestamp).toLocaleTimeString()}`);
+                        });
+                        console.log(`🏁 - Selected winner: ${winner.name} from ${winnerSource}`);
                     }
                     
                     gameState.winner = winner;
+                    gameState.winnerDeterminedAt = Date.now();
+                    gameState.winnerSource = winnerSource;
                     
                     console.log('🏁 Ending game, winner:', winner);
                     
@@ -2040,6 +2229,13 @@
                 try {
                     console.log('🏴 Flag capture attempt by:', this.userUUID);
                     
+                    // CRITICAL: Prevent concurrent flag capture operations
+                    if (this.isFlagCaptureInProgress) {
+                        console.log('🏴 Flag capture already in progress - ignoring click');
+                        ErrorHandler.showError('Capture already in progress');
+                        return;
+                    }
+                    
                     // Check if game is still active
                     if (!this.currentGameState || this.currentGameState.state !== 'in_progress') {
                         ErrorHandler.showError('Game is no longer active');
@@ -2055,6 +2251,8 @@
                         return;
                     }
                     
+                    // Lock flag capture operation
+                    this.isFlagCaptureInProgress = true;
                     this.lastCaptureAttempt = now;
                     
                     const captureBtn = document.getElementById('capture-flag-btn');
@@ -2063,9 +2261,8 @@
                         return;
                     }
                     
-                    captureBtn.disabled = true;
-                    captureBtn.textContent = 'Capturing...';
-                    console.log('Capture button disabled, starting capture process...');
+                    // Keep button enabled and text consistent - no visual state changes
+                    console.log('Starting flag capture process...');
                     
                     // Get current game state to validate game is active
                     console.log('Getting game state for validation...');
@@ -2166,22 +2363,16 @@
                         ErrorHandler.showError('Capture failed - please try again');
                     }
                 } finally {
-                    // Reset button with cooldown
-                    setTimeout(() => {
-                        const captureBtn = document.getElementById('capture-flag-btn');
-                        if (captureBtn) {
-                            captureBtn.disabled = false;
-                            
-                            // Check current flag holder status to set correct text
-                            const isCurrentHolder = this.currentFlagHolder && this.currentFlagHolder.playerUUID === this.userUUID;
-                            captureBtn.textContent = isCurrentHolder ? 'YOU HOLD THE FLAG!' : 'CAPTURE FLAG!';
-                            console.log('Capture button reset. Is current holder:', isCurrentHolder);
-                        }
-                    }, this.captureAttemptCooldown);
+                    // CRITICAL: Always release the flag capture lock
+                    this.isFlagCaptureInProgress = false;
+                    
+                    // Button stays consistent - no state changes needed
+                    console.log('Flag capture operation completed');
                 }
             }
             
-            async setFlagHolderWithRetry(gameID, flagHolderObject, maxRetries = 3) {
+            async setFlagHolderWithRetry(gameID, flagHolderObject, maxRetries = 2) {
+                // Reduced retries and made fail-fast for rapid interactions
                 for (let attempt = 1; attempt <= maxRetries; attempt++) {
                     try {
                         console.log(`Attempt ${attempt}/${maxRetries} to set flag holder`);
@@ -2189,16 +2380,21 @@
                         console.log('Flag holder set successfully');
                         return result;
                     } catch (error) {
-                        if (error.message.includes('Rate limit exceeded') || error.message.includes('timeout')) {
-                            const delay = attempt * 1500; // Exponential backoff: 1.5s, 3s, 4.5s
-                            console.log(`Request failed, waiting ${delay}ms before retry ${attempt}/${maxRetries}`);
-                            
+                        if (error.message.includes('Rate limit exceeded')) {
+                            // FAIL FAST: Don't queue up rate-limited requests
+                            console.log('🚫 Rate limit hit - failing fast to prevent queue buildup');
+                            throw new Error('Server busy - try again in a moment');
+                        } else if (error.message.includes('timeout')) {
+                            // Only retry once for timeouts, with minimal delay
                             if (attempt < maxRetries) {
-                                await new Promise(resolve => setTimeout(resolve, delay));
+                                const shortDelay = 500; // Very short delay - 500ms only
+                                console.log(`Timeout, quick retry in ${shortDelay}ms (${attempt}/${maxRetries})`);
+                                await new Promise(resolve => setTimeout(resolve, shortDelay));
                             } else {
-                                throw new Error('Unable to set flag holder after multiple retries: ' + error.message);
+                                throw new Error('Connection timeout - operation failed');
                             }
                         } else {
+                            // For other errors, don't retry - fail immediately
                             throw error;
                         }
                     }
@@ -2257,20 +2453,15 @@
                     }
                 }
                 
-                // Update capture button state using dedicated flag holder data
+                // Keep capture button simple and consistent - no state changes
                 const captureBtn = document.getElementById('capture-flag-btn');
                 if (captureBtn) {
-                    const isCurrentHolder = this.currentFlagHolder && this.currentFlagHolder.playerUUID === this.userUUID;
-                    captureBtn.disabled = isCurrentHolder;
-                    captureBtn.textContent = isCurrentHolder ? 'YOU HOLD THE FLAG!' : 'CAPTURE FLAG!';
+                    // Ensure button always shows consistent text and stays enabled
+                    captureBtn.textContent = 'CAPTURE FLAG!';
+                    captureBtn.disabled = false;
+                    captureBtn.classList.remove('flag-holder'); // Remove any flag-holder styling
                     
-                    console.log('Capture button state - Is current holder:', isCurrentHolder);
-                    
-                    if (isCurrentHolder) {
-                        captureBtn.classList.add('flag-holder');
-                    } else {
-                        captureBtn.classList.remove('flag-holder');
-                    }
+                    console.log('Capture button kept consistent');
                 }
             }
             
@@ -2290,33 +2481,40 @@
                         return;
                     }
                     
-                    // Determine winner from multiple sources for reliability
+                    // Use the authoritative winner from game state (determined during endGame)
                     console.log('🔍 Game state winner:', gameState.winner);
-                    console.log('🔍 Flag holder history:', gameState.flagHolderHistory);
-                    console.log('🔍 Players:', gameState.players);
+                    console.log('🔍 Winner source:', gameState.winnerSource);
+                    console.log('🔍 Winner determined at:', gameState.winnerDeterminedAt ? new Date(gameState.winnerDeterminedAt).toLocaleTimeString() : 'N/A');
                     
                     let winner = gameState.winner;
                     
-                    // If no winner in game state, check flag holder history as backup
-                    if (!winner && gameState.flagHolderHistory && gameState.flagHolderHistory.length > 0) {
-                        const finalFlagHolder = gameState.flagHolderHistory[0]; // Most recent holder
-                        console.log('🔍 Final flag holder from history:', finalFlagHolder);
-                        winner = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
-                        console.log('🔍 Found winner from flag holder history:', winner);
-                    }
-                    
-                    // If still no winner, try to get from NostrKV flag holder key
+                    // Only fall back to other methods if no authoritative winner was set
                     if (!winner) {
-                        try {
-                            const flagHolder = await nostrKVClient.getFlagHolder(this.gameID);
-                            console.log('🔍 Flag holder from NostrKV:', flagHolder);
-                            if (flagHolder) {
-                                winner = gameState.players.find(p => p.uuid === flagHolder.playerUUID);
-                                console.log('🔍 Found winner from NostrKV flag holder:', winner);
-                            }
-                        } catch (error) {
-                            console.warn('Could not get flag holder from NostrKV:', error);
+                        console.log('🔍 No authoritative winner found, falling back to backup methods...');
+                        
+                        // Check flag holder history as backup
+                        if (gameState.flagHolderHistory && gameState.flagHolderHistory.length > 0) {
+                            const finalFlagHolder = gameState.flagHolderHistory[0]; // Most recent holder
+                            console.log('🔍 Final flag holder from history:', finalFlagHolder);
+                            winner = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
+                            console.log('🔍 Found winner from flag holder history:', winner);
                         }
+                        
+                        // If still no winner, try to get from NostrKV flag holder key
+                        if (!winner) {
+                            try {
+                                const flagHolder = await nostrKVClient.getFlagHolder(this.gameID);
+                                console.log('🔍 Flag holder from NostrKV:', flagHolder);
+                                if (flagHolder) {
+                                    winner = gameState.players.find(p => p.uuid === flagHolder.playerUUID);
+                                    console.log('🔍 Found winner from NostrKV flag holder:', winner);
+                                }
+                            } catch (error) {
+                                console.warn('Could not get flag holder from NostrKV:', error);
+                            }
+                        }
+                    } else {
+                        console.log('🔍 Using authoritative winner from game state:', winner.name);
                     }
                     
                     console.log('🔍 Final determined winner:', winner);
@@ -2980,6 +3178,10 @@
         class ErrorHandler {
             static showError(message, duration = 5000) {
                 const errorContainer = document.getElementById('error-messages');
+                
+                // SINGLE TOAST: Clear any existing toasts first
+                errorContainer.innerHTML = '';
+                
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'status error';
                 errorDiv.textContent = message;
@@ -2995,6 +3197,10 @@
             
             static showSuccess(message, duration = 3000) {
                 const errorContainer = document.getElementById('error-messages');
+                
+                // SINGLE TOAST: Clear any existing toasts first
+                errorContainer.innerHTML = '';
+                
                 const successDiv = document.createElement('div');
                 successDiv.className = 'status success';
                 successDiv.textContent = message;
