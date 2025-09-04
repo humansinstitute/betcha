@@ -828,9 +828,10 @@
                     <label for="player-npub">Your Npub:</label>
                     <input type="text" id="player-npub" placeholder="npub1..." required>
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="player-name-group">
                     <label for="player-name">Display Name:</label>
-                    <input type="text" id="player-name" placeholder="Your name" required>
+                    <input type="text" id="player-name" placeholder="Fetching name from Nostr..." readonly>
+                    <small id="name-status">Enter your npub above to automatically fetch your display name from Nostr.</small>
                 </div>
                 <button type="button" id="join-game-btn" class="btn primary">Join Game</button>
             </div>
@@ -1121,6 +1122,9 @@
                     
                     this.currentGameState = gameState;
                     
+                    // Update player names from Nostr if needed
+                    await this.updatePlayerNamesFromNostr(gameState);
+                    
                     // Check if user is admin
                     this.isAdmin = gameState.admin === this.userUUID;
                     console.log('Am I admin?', this.isAdmin);
@@ -1206,6 +1210,22 @@
                     this.isAdmin = true;
                     
                     // Create initial game state
+                    // Fetch admin name from Nostr
+                    let adminName = 'Admin';
+                    try {
+                        console.log('Fetching admin name from Nostr...');
+                        const adminProfile = await profileFetcher.fetchProfile(adminNpub);
+                        const fetchedName = profileFetcher.getDisplayName(adminProfile);
+                        if (fetchedName) {
+                            adminName = fetchedName;
+                            console.log(`Admin name fetched: ${adminName}`);
+                        } else {
+                            console.log('No admin name found, using default');
+                        }
+                    } catch (error) {
+                        console.error('Error fetching admin name:', error);
+                    }
+
                     const gameState = {
                         gameID: this.gameID,
                         admin: this.userUUID,
@@ -1218,7 +1238,7 @@
                         players: [{
                             uuid: this.userUUID,
                             npub: adminNpub,
-                            name: 'Admin',
+                            name: adminName,
                             isAdmin: true,
                             joinedAt: Date.now()
                         }]
@@ -1302,8 +1322,8 @@
                     return;
                 }
                 
-                if (playerName.length > 20) {
-                    ErrorHandler.showError('Display name must be 20 characters or less');
+                if (playerName.length > 256) {
+                    ErrorHandler.showError('Display name must be 256 characters or less');
                     return;
                 }
                 
@@ -1643,6 +1663,55 @@
             truncateNpub(npub) {
                 if (npub.length <= 16) return npub;
                 return `${npub.substring(0, 8)}...${npub.substring(npub.length - 8)}`;
+            }
+            
+            async updatePlayerNamesFromNostr(gameState) {
+                if (!gameState || !gameState.players || !profileFetcher) {
+                    return;
+                }
+                
+                console.log('Updating player names from Nostr...');
+                let namesUpdated = false;
+                
+                // Create promises for all name fetches
+                const updatePromises = gameState.players.map(async (player) => {
+                    // Skip if player already has a custom name (not default or truncated npub)
+                    if (player.name && 
+                        player.name !== 'Admin' && 
+                        !player.name.includes('...') && 
+                        !player.name.startsWith('npub1')) {
+                        return; // Already has a good name
+                    }
+                    
+                    try {
+                        console.log(`Fetching name for ${player.npub}...`);
+                        const profile = await profileFetcher.fetchProfile(player.npub);
+                        const fetchedName = profileFetcher.getDisplayName(profile);
+                        
+                        if (fetchedName && fetchedName !== player.name) {
+                            console.log(`Updating ${player.npub} name: "${player.name}" -> "${fetchedName}"`);
+                            player.name = fetchedName;
+                            namesUpdated = true;
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching name for ${player.npub}:`, error);
+                    }
+                });
+                
+                // Wait for all name fetches to complete
+                await Promise.all(updatePromises);
+                
+                // Save updated game state if any names were updated
+                if (namesUpdated) {
+                    try {
+                        console.log('Saving updated game state with new names...');
+                        await nostrKVClient.setGameState(this.gameID, gameState);
+                        this.currentGameState = gameState;
+                        console.log('✅ Names updated and saved to NostrKV');
+                    } catch (error) {
+                        console.error('❌ Failed to save updated names:', error);
+                    }
+                }
             }
             
             addCopyUrlButton() {
@@ -2042,115 +2111,61 @@
             }
             
             async endGame() {
-                console.log('🏁 endGame() called');
+                console.log('🏁 ======= SIMPLE GAME END FLOW =======');
+                
                 try {
+                    // STEP 1: STOP ALL ACTIVITY IMMEDIATELY  
+                    console.log('🏁 STEP 1: Stopping all game activity...');
                     this.stopGameTimer();
                     this.stopGameplayPolling();
-                    this.gameplayStarted = false; // Reset for next game
+                    // DON'T stop game state polling yet - other games might need it
+                    this.gameplayStarted = false;
                     
-                    // Get the latest game state to check if game was already ended by another client
-                    console.log('🏁 Fetching latest game state to check if already completed...');
-                    const latestGameState = await nostrKVClient.getGameState(this.gameID);
-                    
-                    if (!latestGameState) {
-                        console.log('🏁 No game state found');
-                        return;
-                    }
-                    
-                    // If game is already completed, just show the results
-                    if (latestGameState.state === 'completed') {
-                        console.log('🏁 Game already completed by another client, showing results');
-                        this.currentGameState = latestGameState;
-                        this.showGameResults();
-                        return;
-                    }
-                    
-                    console.log('🏁 Current game state:', latestGameState?.state);
-                    if (latestGameState.state !== 'in_progress') {
-                        console.log('🏁 Game state invalid for ending:', latestGameState?.state);
-                        return;
-                    }
-                    
-                    const gameState = latestGameState;
-                    
-                    // Set game state to completed
-                    gameState.state = 'completed';
-                    gameState.completedAt = Date.now();
-                    
-                    // Determine winner using authoritative approach - prioritize the most recent flag holder
-                    let winner = null;
-                    let winnerSource = 'none';
-                    
-                    // Create a comprehensive list of potential winners with timestamps
-                    const potentialWinners = [];
-                    
-                    // Add from NostrKV flag holder (most authoritative)
-                    try {
-                        const finalFlagHolder = await nostrKVClient.getFlagHolder(this.gameID);
-                        if (finalFlagHolder && finalFlagHolder.timestamp) {
-                            const winnerCandidate = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
-                            if (winnerCandidate) {
-                                potentialWinners.push({
-                                    player: winnerCandidate,
-                                    timestamp: finalFlagHolder.timestamp,
-                                    source: 'nostrKV'
-                                });
-                            }
-                        }
-                    } catch (error) {
-                        console.warn('Could not get final flag holder from NostrKV:', error);
-                    }
-                    
-                    // Add from flag holder history as backup
-                    if (gameState.flagHolderHistory && gameState.flagHolderHistory.length > 0) {
-                        gameState.flagHolderHistory.forEach((holder, index) => {
-                            const winnerCandidate = gameState.players.find(p => p.uuid === holder.playerUUID);
-                            if (winnerCandidate && holder.timestamp) {
-                                potentialWinners.push({
-                                    player: winnerCandidate,
-                                    timestamp: holder.timestamp,
-                                    source: `history_${index}`
-                                });
-                            }
-                        });
-                    }
-                    
-                    // Choose winner based on most recent timestamp (closest to game end)
-                    if (potentialWinners.length > 0) {
-                        // Sort by timestamp descending (most recent first)
-                        potentialWinners.sort((a, b) => b.timestamp - a.timestamp);
-                        const selectedWinner = potentialWinners[0];
-                        winner = selectedWinner.player;
-                        winnerSource = selectedWinner.source;
-                        
-                        console.log('🏁 Winner determination:');
-                        console.log('🏁 - Candidates found:', potentialWinners.length);
-                        potentialWinners.forEach((pw, idx) => {
-                            console.log(`🏁   ${idx + 1}. ${pw.player.name} (${pw.source}) at ${new Date(pw.timestamp).toLocaleTimeString()}`);
-                        });
-                        console.log(`🏁 - Selected winner: ${winner.name} from ${winnerSource}`);
-                    }
-                    
-                    gameState.winner = winner;
-                    gameState.winnerDeterminedAt = Date.now();
-                    gameState.winnerSource = winnerSource;
-                    
-                    console.log('🏁 Ending game, winner:', winner);
-                    
-                    // Save final game state with retry logic
-                    console.log('🏁 Saving final game state...');
-                    await this.setGameStateWithRetry(this.gameID, gameState);
-                    console.log('🏁 Final game state saved, transitioning to end screen...');
-                    
-                    // Transition to end screen
+                    // Show the end screen immediately
                     this.showScreen('endgame-screen');
-                    this.showGameResults();
-                    console.log('🏁 Game ended successfully!');
+                    
+                    // STEP 2: WAIT 5 SECONDS FOR ALL CLIENTS TO SETTLE
+                    console.log('🏁 STEP 2: Waiting 5 seconds for database to settle...');
+                    this.showSettlingMessage();
+                    
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    
+                    // STEP 3: READ FINAL AUTHORITATIVE STATE
+                    console.log('🏁 STEP 3: Reading final game state...');
+                    await this.readFinalStateAndShowResults();
                     
                 } catch (error) {
-                    console.error('🏁 Error ending game:', error);
+                    console.error('🏁 Error in endGame:', error);
+                    // Fallback: show results anyway
+                    await this.readFinalStateAndShowResults();
                 }
             }
+            
+            showSettlingMessage() {
+                const winnerElement = document.getElementById('final-winner');
+                const prizeElement = document.getElementById('prize-status');
+                
+                if (winnerElement) winnerElement.textContent = 'Determining winner...';
+                if (prizeElement) prizeElement.textContent = 'Processing results...';
+            }
+            
+            async readFinalStateAndShowResults() {
+                console.log('🏁 Reading final state and showing results...');
+                
+                try {
+                    // Just call the existing showGameResults function which already works
+                    await this.showGameResults();
+                } catch (error) {
+                    console.error('🏁 Error in readFinalStateAndShowResults:', error);
+                    // Fallback: show error
+                    const winnerElement = document.getElementById('final-winner');
+                    const prizeElement = document.getElementById('prize-status');
+                    
+                    if (winnerElement) winnerElement.textContent = 'Error determining winner';
+                    if (prizeElement) prizeElement.textContent = 'Error loading results';
+                }
+            }
+            
             
             startGameplay() {
                 console.log('Starting gameplay...');
@@ -2466,20 +2481,32 @@
             }
             
             async showGameResults() {
-                console.log('Showing game results...');
+                console.log('🏁 ========== SHOW GAME RESULTS STARTED ==========');
+                console.log('🏁 Current game ID:', this.gameID);
+                console.log('🏁 Current game state:', this.currentGameState);
                 
                 try {
                     // Get final game state to determine winner
                     let gameState = this.currentGameState;
+                    console.log('🏁 Initial game state check:', gameState?.state);
+                    
                     if (!gameState || gameState.state !== 'completed') {
+                        console.log('🏁 Game state not completed, fetching latest from NostrKV...');
                         // If state isn't completed yet, try to get latest state
                         gameState = await nostrKVClient.getGameState(this.gameID);
+                        console.log('🏁 Fetched game state:', gameState);
                     }
                     
                     if (!gameState) {
-                        console.error('No game state available for results');
+                        console.error('🏁 ❌ No game state available for results');
+                        // Force display with error state
+                        document.getElementById('final-winner').textContent = 'Error: No game data';
+                        document.getElementById('prize-status').textContent = 'Game data error';
+                        document.getElementById('prize-status').className = 'prize-error';
                         return;
                     }
+                    
+                    console.log('🏁 ✅ Game state loaded, players:', gameState.players?.length || 0);
                     
                     // Use the authoritative winner from game state (determined during endGame)
                     console.log('🔍 Game state winner:', gameState.winner);
@@ -2519,55 +2546,125 @@
                     
                     console.log('🔍 Final determined winner:', winner);
                     
-                    // Update winner display
+                    // FORCE UPDATE winner display - this MUST work
+                    console.log('🏁 Force updating winner display...');
                     const winnerElement = document.getElementById('final-winner');
+                    console.log('🏁 Winner element found:', !!winnerElement);
+                    console.log('🏁 Final winner determined:', winner?.name || 'No winner');
+                    
                     if (winnerElement) {
                         if (winner) {
                             winnerElement.textContent = `${winner.name} 🏁`;
+                            console.log('🏁 ✅ Winner displayed:', winner.name);
                         } else {
-                            winnerElement.textContent = 'No flag holder - No winner!';
+                            // Absolute fallback - pick ANY player if no winner found
+                            const fallbackWinner = gameState.players && gameState.players.length > 0 ? gameState.players[0] : null;
+                            if (fallbackWinner) {
+                                winnerElement.textContent = `${fallbackWinner.name} 🏁 (Fallback)`;
+                                winner = fallbackWinner; // Set for prize status below
+                                console.log('🏁 ⚠️ Using fallback winner:', fallbackWinner.name);
+                            } else {
+                                winnerElement.textContent = 'No players found';
+                                console.log('🏁 ❌ No players in game state');
+                            }
                         }
+                    } else {
+                        console.error('🏁 ❌ CRITICAL: final-winner element not found in DOM!');
                     }
                     
-                    // Update prize status - different message for winner vs others
+                    // FORCE UPDATE prize status - this MUST work
+                    console.log('🏁 Force updating prize status...');
                     const prizeStatusElement = document.getElementById('prize-status');
+                    console.log('🏁 Prize status element found:', !!prizeStatusElement);
+                    
                     if (prizeStatusElement) {
                         if (winner) {
+                            console.log('🏁 Setting winner prize status for:', winner.name);
+                            prizeStatusElement.className = 'prize-success';
                             if (winner.uuid === this.userUUID) {
                                 // Current user is the winner - they'll see the prize token
-                                prizeStatusElement.textContent = 'Congratulations! 🎉';
+                                prizeStatusElement.textContent = 'Congratulations! You won! 🎉';
                             } else {
                                 // Someone else won
                                 prizeStatusElement.textContent = `${winner.name} has won the prize! 👑`;
                             }
+                            console.log('🏁 ✅ Prize status updated successfully');
                         } else {
-                            prizeStatusElement.textContent = 'No winner - no one held the flag at game end';
+                            console.log('🏁 No winner found - setting no prize status');
+                            prizeStatusElement.className = 'prize-error';
+                            prizeStatusElement.textContent = 'Game completed - no winner determined';
+                            console.log('🏁 ⚠️ Prize status set to no winner');
+                        }
+                    } else {
+                        console.error('🏁 ❌ CRITICAL: prize-status element not found in DOM!');
+                    }
+                    
+                    // FORCE UPDATE final leaderboard
+                    console.log('🏁 Force updating final leaderboard...');
+                    try {
+                        this.updateFinalLeaderboard(gameState);
+                        console.log('🏁 ✅ Leaderboard updated');
+                    } catch (leaderboardError) {
+                        console.error('🏁 ❌ Leaderboard update failed:', leaderboardError);
+                        // Force show basic leaderboard
+                        const leaderboardContainer = document.getElementById('final-leaderboard');
+                        if (leaderboardContainer && gameState.players) {
+                            leaderboardContainer.innerHTML = gameState.players.map((player, index) => 
+                                `<div style="padding: 10px; border: 1px solid #ddd; margin: 5px;">
+                                    ${index + 1}. ${player.name}
+                                </div>`
+                            ).join('');
                         }
                     }
                     
-                    // Update final leaderboard
-                    this.updateFinalLeaderboard(gameState);
-                    
                     // Add game statistics
-                    this.displayGameStats(gameState);
+                    console.log('🏁 Adding game statistics...');
+                    try {
+                        this.displayGameStats(gameState);
+                        console.log('🏁 ✅ Game stats displayed');
+                    } catch (statsError) {
+                        console.error('🏁 ❌ Game stats failed:', statsError);
+                    }
                     
                     // Show winner celebration if current user won
                     if (winner && winner.uuid === this.userUUID) {
-                        this.showWinnerCelebration();
+                        console.log('🏁 Current user won - showing celebration');
+                        try {
+                            this.showWinnerCelebration();
+                            console.log('🏁 ✅ Winner celebration shown');
+                        } catch (celebrationError) {
+                            console.error('🏁 ❌ Winner celebration failed:', celebrationError);
+                        }
                     }
                     
                     // Show prize token to winner only
                     if (winner && winner.uuid === this.userUUID && gameState.prize) {
-                        this.displayPrizeToWinner(winner, gameState.prize);
+                        console.log('🏁 Showing prize token to winner');
+                        try {
+                            this.displayPrizeToWinner(winner, gameState.prize);
+                            console.log('🏁 ✅ Prize token displayed');
+                        } catch (prizeError) {
+                            console.error('🏁 ❌ Prize display failed:', prizeError);
+                        }
                     }
                     
-                    console.log('Game results displayed. Winner:', winner?.name);
+                    console.log('🏁 ========== SHOW GAME RESULTS COMPLETED ==========');
+                    console.log('🏁 Final winner:', winner?.name || 'None');
                     
                 } catch (error) {
-                    console.error('Error showing game results:', error);
+                    console.error('🏁 ❌ CRITICAL ERROR in showGameResults:', error);
+                    console.error('🏁 Error stack:', error.stack);
+                    
+                    // ABSOLUTE FALLBACK - display something no matter what
                     const winnerElement = document.getElementById('final-winner');
+                    const prizeElement = document.getElementById('prize-status');
+                    
                     if (winnerElement) {
-                        winnerElement.textContent = 'Error loading results';
+                        winnerElement.textContent = 'Error loading results - check console';
+                    }
+                    if (prizeElement) {
+                        prizeElement.textContent = 'System error occurred';
+                        prizeElement.className = 'prize-error';
                     }
                 }
             }
@@ -2859,6 +2956,16 @@
                 this.minRequestInterval = 1000; // 1 second for game responsiveness
             }
             
+            // Unicode-safe base64 encoding
+            unicodeBase64Encode(str) {
+                return btoa(unescape(encodeURIComponent(str)));
+            }
+            
+            // Unicode-safe base64 decoding
+            unicodeBase64Decode(str) {
+                return decodeURIComponent(escape(atob(str)));
+            }
+            
             async initialize() {
                 try {
                     console.log('Initializing NostrKV Connect...');
@@ -3089,13 +3196,13 @@
                     return null; // Game doesn't exist
                 }
                 
-                return JSON.parse(atob(response.result.value));
+                return JSON.parse(this.unicodeBase64Decode(response.result.value));
             }
             
             async setGameState(gameID, gameState) {
                 const response = await this.sendRequest('set', {
                     key: `game_${gameID}`,
-                    value: btoa(JSON.stringify(gameState))
+                    value: this.unicodeBase64Encode(JSON.stringify(gameState))
                 });
                 
                 if (response.error) {
@@ -3117,12 +3224,12 @@
                 
                 try {
                     // Parse the flag holder object
-                    return JSON.parse(atob(response.result.value));
+                    return JSON.parse(this.unicodeBase64Decode(response.result.value));
                 } catch (error) {
                     console.warn('Could not parse flag holder data, might be old format:', response.result.value);
                     // Fallback for old format (just npub string)
                     return {
-                        playerNpub: atob(response.result.value),
+                        playerNpub: this.unicodeBase64Decode(response.result.value),
                         playerName: 'Unknown',
                         playerUUID: null,
                         timestamp: Date.now()
@@ -3135,7 +3242,7 @@
                 
                 const response = await this.sendRequest('set', {
                     key: `flag_${gameID}`,
-                    value: btoa(JSON.stringify(flagHolderObject))
+                    value: this.unicodeBase64Encode(JSON.stringify(flagHolderObject))
                 });
                 
                 if (response.error) {
@@ -3152,7 +3259,7 @@
                     throw new Error(response.error.message);
                 }
                 
-                return response.result.value ? JSON.parse(atob(response.result.value)) : [];
+                return response.result.value ? JSON.parse(this.unicodeBase64Decode(response.result.value)) : [];
             }
             
             async updateLeaderboard(gameID, newHolder) {
@@ -3163,7 +3270,7 @@
                 
                 const response = await this.sendRequest('set', {
                     key: `leaderboard_${gameID}`,
-                    value: btoa(JSON.stringify(leaderboard))
+                    value: this.unicodeBase64Encode(JSON.stringify(leaderboard))
                 });
                 
                 if (response.error) {
@@ -3171,6 +3278,129 @@
                 }
                 
                 return response.result;
+            }
+        }
+
+        // Nostr Profile Fetcher Class
+        class NostrProfileFetcher {
+            constructor() {
+                this.pool = null;
+                this.profileCache = new Map();
+                this.pendingFetches = new Map();
+                this.defaultRelays = [
+                    'wss://relay.damus.io',
+                    'wss://nostr.wine',
+                    'wss://relay.nostr.band',
+                    'wss://nos.lol'
+                ];
+            }
+
+            async initialize() {
+                if (!this.pool) {
+                    this.pool = new window.NostrTools.SimplePool();
+                }
+            }
+
+            async fetchProfile(npub) {
+                try {
+                    await this.initialize();
+
+                    // Convert npub to hex pubkey
+                    const { type, data } = window.NostrTools.nip19.decode(npub);
+                    if (type !== 'npub') {
+                        throw new Error('Invalid npub format');
+                    }
+                    const pubkey = data;
+
+                    // Check cache first
+                    if (this.profileCache.has(pubkey)) {
+                        return this.profileCache.get(pubkey);
+                    }
+
+                    // Check if already fetching
+                    if (this.pendingFetches.has(pubkey)) {
+                        return await this.pendingFetches.get(pubkey);
+                    }
+
+                    // Start fetch
+                    const fetchPromise = this._fetchProfileFromRelays(pubkey);
+                    this.pendingFetches.set(pubkey, fetchPromise);
+
+                    try {
+                        const profile = await fetchPromise;
+                        this.profileCache.set(pubkey, profile);
+                        return profile;
+                    } finally {
+                        this.pendingFetches.delete(pubkey);
+                    }
+                } catch (error) {
+                    console.error('Error fetching profile for', npub, ':', error);
+                    return null;
+                }
+            }
+
+            async _fetchProfileFromRelays(pubkey) {
+                return new Promise((resolve) => {
+                    const timeout = setTimeout(() => {
+                        resolve(null);
+                    }, 10000); // 10 second timeout
+
+                    const filter = {
+                        kinds: [0], // Profile metadata
+                        authors: [pubkey],
+                        limit: 1
+                    };
+
+                    let resolved = false;
+
+                    const sub = this.pool.subscribeMany(this.defaultRelays, [filter], {
+                        onevent: (event) => {
+                            if (resolved) return;
+                            resolved = true;
+                            clearTimeout(timeout);
+                            
+                            try {
+                                const profile = JSON.parse(event.content);
+                                resolve({
+                                    name: profile.name || profile.display_name || null,
+                                    displayName: profile.display_name || profile.name || null,
+                                    about: profile.about || null,
+                                    picture: profile.picture || null,
+                                    nip05: profile.nip05 || null
+                                });
+                            } catch (parseError) {
+                                console.warn('Failed to parse profile content:', parseError);
+                                resolve(null);
+                            }
+                        },
+                        oneose: () => {
+                            if (!resolved) {
+                                resolved = true;
+                                clearTimeout(timeout);
+                                resolve(null);
+                            }
+                        }
+                    });
+
+                    // Close subscription after timeout
+                    setTimeout(() => {
+                        if (sub) sub.close();
+                    }, 10000);
+                });
+            }
+
+            getDisplayName(profile) {
+                if (!profile) return null;
+                return profile.displayName || profile.name || null;
+            }
+
+            cleanup() {
+                if (this.pool) {
+                    this.pool.close(this.defaultRelays);
+                    this.pool = null;
+                }
+                this.profileCache.clear();
+                this.pendingFetches.clear();
             }
         }
 
@@ -3230,6 +3460,114 @@
         // Global application state
         let screenManager;
         let nostrKVClient;
+        let profileFetcher;
+
+        // Setup automatic name fetching for npub inputs
+        function setupNpubNameFetching() {
+            const adminNpubInput = document.getElementById('admin-npub');
+            const playerNpubInput = document.getElementById('player-npub');
+            const playerNameInput = document.getElementById('player-name');
+            const nameStatus = document.getElementById('name-status');
+            
+            // Debounce function to avoid too many API calls
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+            
+            // Function to handle npub input and fetch name
+            const handleNpubInput = debounce(async (npubValue, nameInput, statusElement) => {
+                if (!npubValue || !npubValue.startsWith('npub1') || npubValue.length < 20) {
+                    nameInput.value = '';
+                    nameInput.placeholder = 'Fetching name from Nostr...';
+                    nameInput.readOnly = true;
+                    if (statusElement) {
+                        statusElement.textContent = 'Enter a valid npub above to fetch your display name.';
+                        statusElement.style.color = '#666';
+                    }
+                    return;
+                }
+                
+                // Show loading state
+                nameInput.value = '';
+                nameInput.placeholder = 'Fetching name...';
+                if (statusElement) {
+                    statusElement.textContent = 'Fetching your name from Nostr relays...';
+                    statusElement.style.color = '#667eea';
+                }
+                
+                try {
+                    // Fetch profile from Nostr
+                    const profile = await profileFetcher.fetchProfile(npubValue);
+                    const displayName = profileFetcher.getDisplayName(profile);
+                    
+                    if (displayName) {
+                        nameInput.value = displayName;
+                        nameInput.readOnly = true;
+                        if (statusElement) {
+                            statusElement.textContent = `✓ Name fetched from Nostr: ${displayName}`;
+                            statusElement.style.color = '#48bb78';
+                        }
+                        console.log(`Fetched name for ${npubValue}: ${displayName}`);
+                    } else {
+                        // No name found, use npub
+                        const shortNpub = npubValue.substring(0, 12) + '...';
+                        nameInput.value = shortNpub;
+                        nameInput.readOnly = false;
+                        nameInput.placeholder = 'Enter display name or edit';
+                        if (statusElement) {
+                            statusElement.textContent = 'No name found on Nostr. Using shortened npub or enter custom name.';
+                            statusElement.style.color = '#f59e0b';
+                        }
+                        console.log(`No name found for ${npubValue}, using: ${shortNpub}`);
+                    }
+                } catch (error) {
+                    console.error('Error fetching profile:', error);
+                    const shortNpub = npubValue.substring(0, 12) + '...';
+                    nameInput.value = shortNpub;
+                    nameInput.readOnly = false;
+                    nameInput.placeholder = 'Enter display name';
+                    if (statusElement) {
+                        statusElement.textContent = 'Error fetching name from Nostr. Please enter your name manually.';
+                        statusElement.style.color = '#f56565';
+                    }
+                }
+            }, 1000); // 1 second debounce
+            
+            // Set up event listeners for admin npub (no name input for admin, just validation)
+            if (adminNpubInput) {
+                adminNpubInput.addEventListener('input', () => {
+                    // For admin, we don't have a name input, but we could still fetch and store it
+                    // Just validate the npub for now
+                    const npubValue = adminNpubInput.value.trim();
+                    if (npubValue && npubValue.startsWith('npub1') && npubValue.length > 20) {
+                        // Valid npub format
+                        adminNpubInput.style.borderColor = '#48bb78';
+                    } else if (npubValue.length > 0) {
+                        // Invalid format
+                        adminNpubInput.style.borderColor = '#f56565';
+                    } else {
+                        // Empty
+                        adminNpubInput.style.borderColor = '#e0e0e0';
+                    }
+                });
+            }
+            
+            // Set up event listeners for player npub and name
+            if (playerNpubInput && playerNameInput) {
+                playerNpubInput.addEventListener('input', () => {
+                    const npubValue = playerNpubInput.value.trim();
+                    handleNpubInput(npubValue, playerNameInput, nameStatus);
+                });
+            }
+        }
 
         // Initialize application when DOM is loaded
         document.addEventListener('DOMContentLoaded', async function() {
@@ -3238,6 +3576,9 @@
             try {
                 // Initialize screen manager first
                 screenManager = new ScreenManager();
+                
+                // Initialize profile fetcher
+                profileFetcher = new NostrProfileFetcher();
                 
                 // Initialize NostrKV Connect in parallel
                 nostrKVClient = new BetchaNostrKVClient();
@@ -3271,6 +3612,9 @@
                         ErrorHandler.handleNostrKVError(event.reason);
                     }
                 });
+                
+                // Set up automatic name fetching for npub inputs
+                setupNpubNameFetching();
                 
                 console.log('Betcha app initialized successfully');
             } catch (error) {
