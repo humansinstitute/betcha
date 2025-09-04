@@ -1,0 +1,3119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Betcha - Capture The Flag</title>
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* Screen management */
+        .screen {
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Common UI components */
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 100%;
+            margin: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        /* Form styling */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        /* Button styling */
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn.primary {
+            background: #667eea;
+        }
+
+        .btn.success {
+            background: #48bb78;
+        }
+
+        .btn.danger {
+            background: #f56565;
+        }
+
+        .btn.large {
+            padding: 20px 40px;
+            font-size: 18px;
+            border-radius: 12px;
+        }
+
+        /* Status indicators */
+        .status {
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .status.error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #feb2b2;
+        }
+
+        .status.warning {
+            background: #fefcbf;
+            color: #744210;
+            border: 1px solid #faf089;
+        }
+
+        .status.info {
+            background: #bee3f8;
+            color: #2a4365;
+            border: 1px solid #90cdf4;
+        }
+
+        /* UUID display */
+        .uuid-display {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #4a5568;
+            margin-bottom: 20px;
+        }
+
+        /* Connection status */
+        #connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 1000;
+        }
+
+        #error-messages {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            max-width: 300px;
+            z-index: 1000;
+        }
+
+        /* Player list */
+        .players-list {
+            margin: 20px 0;
+        }
+
+        .player-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .player-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .player-info h4 {
+            margin: 0;
+            color: #333;
+        }
+
+        .player-info p {
+            margin: 0;
+            font-size: 12px;
+            color: #666;
+            font-family: monospace;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .btn {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+
+        /* Game-specific styles */
+        .flag-display {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .pirate-flag {
+            width: 200px;
+            height: auto;
+            animation: wave 2s ease-in-out infinite;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+        
+        @keyframes wave {
+            0%, 100% { transform: rotate(-2deg); }
+            50% { transform: rotate(2deg); }
+        }
+
+        .timer-display {
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            color: #f56565;
+            margin: 20px 0;
+        }
+
+        .leaderboard {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .leaderboard h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .leaderboard-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border-left: 4px solid #667eea;
+            font-size: 14px;
+        }
+        
+        .leaderboard-item.current-holder {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+        }
+        
+        .leaderboard-item .rank {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .leaderboard-item .name {
+            font-weight: 500;
+        }
+        
+        .leaderboard-item .captures {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .leaderboard-item .time {
+            color: #6c757d;
+            font-size: 12px;
+        }
+        
+        /* Flag capture button states */
+        .btn.flag-holder {
+            background: #ffc107 !important;
+            color: #212529 !important;
+            cursor: not-allowed !important;
+        }
+        
+        .btn.flag-holder:hover {
+            background: #e0a800 !important;
+        }
+        
+        /* Timer display colors */
+        #game-timer {
+            font-size: 2rem;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+        
+        /* QR Code styling */
+        .qr-code-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .qr-code-container h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .qr-code-container p {
+            margin-bottom: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        #qr-code-canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .game-url {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        #game-url-input {
+            flex: 1;
+            min-width: 300px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+        }
+        
+        .btn.small {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+
+        /* End game enhancements */
+        .current-user-winner {
+            color: #48bb78;
+            font-size: 1.3em;
+            text-shadow: 0 2px 4px rgba(72, 187, 120, 0.3);
+            animation: winner-glow 2s infinite alternate;
+        }
+
+        @keyframes winner-glow {
+            0% { text-shadow: 0 2px 4px rgba(72, 187, 120, 0.3); }
+            100% { text-shadow: 0 4px 8px rgba(72, 187, 120, 0.6); }
+        }
+
+        /* Winner celebration animation */
+        .winner-celebration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(72, 187, 120, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            animation: celebration-appear 0.8s ease;
+        }
+
+        .celebration-content {
+            text-align: center;
+            color: white;
+            animation: celebration-bounce 1s ease infinite alternate;
+        }
+
+        .celebration-icon {
+            font-size: 8rem;
+            margin-bottom: 20px;
+        }
+
+        .celebration-text {
+            font-size: 4rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .celebration-subtext {
+            font-size: 1.5rem;
+            opacity: 0.9;
+        }
+
+        @keyframes celebration-appear {
+            0% { opacity: 0; transform: scale(0.5); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes celebration-bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-20px); }
+        }
+
+        /* Game statistics display */
+        .game-stats {
+            margin: 25px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .game-stats h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            text-align: center;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        /* Prize status styling */
+        #prize-status {
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        #prize-status.prize-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        #prize-status.prize-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        #prize-status.prize-pending {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            animation: pulse-pending 2s infinite;
+        }
+
+        @keyframes pulse-pending {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* End game action buttons */
+        #new-game-btn, #join-another-btn {
+            margin: 10px;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            min-width: 180px;
+        }
+
+        #new-game-btn {
+            background: #48bb78;
+        }
+
+        #new-game-btn:hover {
+            background: #38a169;
+        }
+
+        #join-another-btn {
+            background: #667eea;
+        }
+
+        #join-another-btn:hover {
+            background: #5a67d8;
+        }
+
+        /* Prize token display */
+        .prize-token-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #fff9c4, #fff);
+            border: 2px solid #ffd700;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+        }
+
+        .prize-token-header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .prize-token-header h3 {
+            margin: 0 0 5px 0;
+            color: #b45309;
+            font-size: 1.4rem;
+        }
+
+        .prize-token-header p {
+            margin: 0;
+            color: #92400e;
+            font-size: 0.9rem;
+        }
+
+        .prize-token-display {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .prize-token-input {
+            flex: 1;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            border: 2px solid #fbbf24;
+            border-radius: 6px;
+            background: #fffbeb;
+            color: #92400e;
+            word-break: break-all;
+        }
+
+        .prize-token-input:focus {
+            outline: none;
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+
+        #copy-prize-btn {
+            white-space: nowrap;
+            min-width: 120px;
+            background: #f59e0b;
+            border-color: #f59e0b;
+        }
+
+        #copy-prize-btn:hover {
+            background: #d97706;
+            border-color: #d97706;
+        }
+
+        .prize-token-footer {
+            text-align: center;
+            color: #78716c;
+            font-style: italic;
+        }
+
+        /* Mobile enhancements for end game */
+        @media (max-width: 768px) {
+            .celebration-icon {
+                font-size: 4rem;
+            }
+            
+            .celebration-text {
+                font-size: 2.5rem;
+            }
+            
+            .celebration-subtext {
+                font-size: 1.2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            
+            .stat-item {
+                padding: 10px 5px;
+            }
+            
+            .stat-value {
+                font-size: 1.2rem;
+            }
+            
+            #new-game-btn, #join-another-btn {
+                width: 100%;
+                margin: 5px 0;
+                min-width: unset;
+            }
+            
+            /* Mobile prize token */
+            .prize-token-display {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            #copy-prize-btn {
+                width: 100%;
+                min-width: unset;
+            }
+            
+            .prize-token-input {
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Screen containers -->
+    <div id="start-game-screen" class="screen">
+        <div class="container">
+            <div class="header">
+                <h1>🏁 Betcha</h1>
+                <p>Capture The Flag on Nostr</p>
+            </div>
+            
+            <div class="uuid-display">
+                Your Session ID: <span class="user-uuid"></span>
+            </div>
+            
+            <form id="create-game-form">
+                <div class="form-group">
+                    <label for="admin-npub">Your Npub (to play as admin):</label>
+                    <input type="text" id="admin-npub" placeholder="npub1..." required>
+                    <small>This will be used for gameplay and prize eligibility</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="prize-token">Prize Token (Cashu):</label>
+                    <textarea id="prize-token" rows="3" placeholder="cashuA..." required></textarea>
+                    <small>Winner will receive this token via Nostr DM</small>
+                </div>
+                
+                <button type="submit" class="btn primary large">Create Game</button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="game-lobby-screen" class="screen hidden">
+        <div class="container">
+            <div class="header">
+                <h1>🎯 Game Lobby</h1>
+                <p>Game ID: <span id="current-game-id"></span></p>
+            </div>
+            
+            <div class="uuid-display">
+                Your Session ID: <span class="user-uuid"></span>
+            </div>
+            
+            <!-- Admin controls (shown only to game creator) -->
+            <div id="admin-controls" class="hidden">
+                <div class="status info">
+                    <strong>You are the game admin</strong>
+                </div>
+                <button id="start-game-btn" class="btn success large" disabled>
+                    Start Game (need 2+ players)
+                </button>
+            </div>
+            
+            <!-- QR Code sharing (shown to admin and players already in game) -->
+            <div id="qr-code-section" class="hidden">
+                <div class="qr-code-container">
+                    <h3>📱 Share Game</h3>
+                    <p>Scan to join from mobile:</p>
+                    <canvas id="qr-code-canvas"></canvas>
+                    <div class="game-url">
+                        <input type="text" id="game-url-input" readonly>
+                        <button id="copy-url-btn" class="btn secondary small">Copy Link</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Join game form (shown to non-participants) -->
+            <div id="join-game-form" class="hidden">
+                <h3>Join This Game</h3>
+                <div class="form-group">
+                    <label for="player-npub">Your Npub:</label>
+                    <input type="text" id="player-npub" placeholder="npub1..." required>
+                </div>
+                <div class="form-group">
+                    <label for="player-name">Display Name:</label>
+                    <input type="text" id="player-name" placeholder="Your name" required>
+                </div>
+                <button type="button" id="join-game-btn" class="btn primary">Join Game</button>
+            </div>
+            
+            <!-- Players list -->
+            <div class="players-list">
+                <h3>Players (<span id="player-count">0</span>)</h3>
+                <div id="players-container">
+                    <!-- Player items will be inserted here -->
+                </div>
+            </div>
+            
+            <!-- Game info -->
+            <div class="status info">
+                <strong>Game Status:</strong> <span id="game-status">Waiting for players</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="gameplay-screen" class="screen hidden">
+        <div class="container">
+            <div class="header">
+                <h1>🏁 CAPTURE THE FLAG!</h1>
+                <div class="timer-display" id="game-timer">--:--</div>
+            </div>
+            
+            <div class="flag-display">
+                <img src="https://media.istockphoto.com/id/1345978756/vector/pirate-flag.jpg?s=612x612&w=0&k=20&c=hDYTgfQb51dH3Jv3TXySPu7V7YWV5yBWwYrmouoVjbc=" alt="Pirate Flag" class="pirate-flag" />
+            </div>
+            
+            <div class="status info">
+                <strong>Current Flag Holder:</strong> <span id="current-flag-holder">None</span>
+            </div>
+            
+            <button id="capture-flag-btn" class="btn danger large">
+                CAPTURE FLAG!
+            </button>
+            
+            <div class="leaderboard">
+                <h3>Flag Holders</h3>
+                <div id="leaderboard-container">
+                    <!-- Flag holder history will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="endgame-screen" class="screen hidden">
+        <div class="container">
+            <div class="header">
+                <h1>🎉 Game Complete!</h1>
+            </div>
+            
+            <div class="status success">
+                <h2>🏆 Winner: <span id="final-winner"></span></h2>
+                <p>Prize Status: <span id="prize-status">Sending...</span></p>
+            </div>
+            
+            <div class="leaderboard">
+                <h3>Final Leaderboard</h3>
+                <div id="final-leaderboard">
+                    <!-- Final leaderboard will be inserted here -->
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px;">
+                <button id="new-game-btn" class="btn primary">Start New Game</button>
+                <button id="join-another-btn" class="btn">Join Another Game</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Global status elements -->
+    <div id="connection-status"></div>
+    <div id="error-messages"></div>
+    
+    <!-- JavaScript -->
+    <script src="https://unpkg.com/nostr-tools@2.10.4/lib/nostr.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="config.js"></script>
+    <script>
+        // Screen Manager Class
+        class ScreenManager {
+            constructor() {
+                this.currentScreen = null;
+                this.gameID = null;
+                this.userUUID = this.getOrCreateUUID();
+                this.isAdmin = false;
+                this.gameStatePoller = null;
+                this.pollingInterval = 2000; // Poll every 2 seconds
+                this.currentGameState = null;
+                
+                // Gameplay-specific properties
+                this.gameplayPoller = null;
+                this.gameplayPollingInterval = 4000; // Poll every 4 seconds during gameplay (further reduced to prevent rate limits)
+                this.lastCaptureAttempt = 0;
+                this.captureAttemptCooldown = 1000; // 1 second cooldown between attempts
+                this.lastPollTime = 0;
+                this.minPollInterval = 3000; // Minimum 3 seconds between any polls (increased to prevent rate limits)
+                this.currentFlagHolder = null;
+                this.currentLeaderboard = [];
+                this.gameTimer = null;
+                this.qrCodeGenerated = false;
+                this.gameplayStarted = false;
+                this.prizeDistributor = null;
+                
+                // Initialize on page load
+                window.addEventListener('load', () => this.initialize());
+                window.addEventListener('popstate', () => this.handleRouteChange());
+            }
+            
+            getOrCreateUUID() {
+                // Check if UUID exists in localStorage
+                let uuid = localStorage.getItem('betcha_user_uuid');
+                
+                if (!uuid) {
+                    // Generate a more unique UUID with timestamp + random
+                    const timestamp = Date.now().toString(36);
+                    const random = Math.random().toString(36).substr(2, 9);
+                    uuid = `uuid_${timestamp}_${random}`;
+                    
+                    // Store in localStorage for persistence
+                    localStorage.setItem('betcha_user_uuid', uuid);
+                    console.log('Generated new UUID:', uuid);
+                } else {
+                    console.log('Using existing UUID:', uuid);
+                }
+                
+                return uuid;
+            }
+            
+            // Keep the old method for legacy compatibility if needed
+            generateUUID() {
+                const timestamp = Date.now().toString(36);
+                const random = Math.random().toString(36).substr(2, 9);
+                return `uuid_${timestamp}_${random}`;
+            }
+            
+            initialize() {
+                console.log('Initializing Betcha app...');
+                this.handleRouteChange();
+                this.displayUserUUID();
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                // Game creation form
+                const createGameForm = document.getElementById('create-game-form');
+                createGameForm.addEventListener('submit', (e) => this.handleCreateGame(e));
+                
+                // Join game button
+                const joinGameBtn = document.getElementById('join-game-btn');
+                joinGameBtn.addEventListener('click', () => this.handleJoinGame());
+                
+                // Start game button (admin only)
+                const startGameBtn = document.getElementById('start-game-btn');
+                startGameBtn.addEventListener('click', () => this.handleStartGame());
+                
+                // Copy URL button
+                const copyUrlBtn = document.getElementById('copy-url-btn');
+                copyUrlBtn.addEventListener('click', () => this.handleCopyUrl());
+                
+                // End game buttons
+                const newGameBtn = document.getElementById('new-game-btn');
+                newGameBtn.addEventListener('click', () => this.handleNewGame());
+                
+                const joinAnotherBtn = document.getElementById('join-another-btn');
+                joinAnotherBtn.addEventListener('click', () => this.handleJoinAnother());
+            }
+            
+            handleRouteChange() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const gameParam = urlParams.get('game');
+                
+                console.log('=== ROUTE CHANGE ===');
+                console.log('Current URL:', window.location.href);
+                console.log('URL search params:', window.location.search);
+                console.log('Game parameter:', gameParam);
+                
+                if (gameParam) {
+                    // Play mode - show game screen
+                    if (this.gameID !== gameParam) {
+                        // Reset QR code generation when game changes
+                        this.qrCodeGenerated = false;
+                    }
+                    this.gameID = gameParam;
+                    console.log('Setting gameID to:', this.gameID);
+                    this.showScreen('game-lobby-screen');
+                    console.log('Loading game state for gameID:', this.gameID);
+                    this.loadGameState();
+                } else {
+                    // Start mode - show create game screen
+                    console.log('No game parameter, showing start screen');
+                    this.gameID = null;
+                    this.qrCodeGenerated = false; // Reset QR code flag
+                    this.isAdmin = false;
+                    this.showScreen('start-game-screen');
+                }
+            }
+            
+            showScreen(screenId) {
+                // Hide all screens
+                document.querySelectorAll('.screen').forEach(screen => {
+                    screen.classList.add('hidden');
+                });
+                
+                // Show target screen
+                const targetScreen = document.getElementById(screenId);
+                if (targetScreen) {
+                    targetScreen.classList.remove('hidden');
+                    this.currentScreen = screenId;
+                    console.log(`Switched to screen: ${screenId}`);
+                }
+            }
+            
+            displayUserUUID() {
+                const uuidDisplays = document.querySelectorAll('.user-uuid');
+                uuidDisplays.forEach(element => {
+                    element.textContent = this.userUUID;
+                });
+            }
+            
+            async loadGameState() {
+                console.log('=== LOAD GAME STATE ===');
+                console.log('gameID:', this.gameID);
+                console.log('userUUID:', this.userUUID);
+                console.log('nostrKVClient connected:', nostrKVClient?.connected);
+                
+                if (!this.gameID) {
+                    console.error('❌ No game ID provided');
+                    return;
+                }
+                
+                if (!nostrKVClient || !nostrKVClient.connected) {
+                    console.warn('⏳ NostrKV client not ready yet, waiting...');
+                    // Wait for connection and retry
+                    const maxRetries = 30; // 15 seconds
+                    let retries = 0;
+                    
+                    const waitForConnection = setInterval(async () => {
+                        retries++;
+                        console.log(`⏳ Waiting for NostrKV connection... (${retries}/${maxRetries})`);
+                        
+                        if (nostrKVClient && nostrKVClient.connected) {
+                            clearInterval(waitForConnection);
+                            console.log('✅ NostrKV connected, loading game state...');
+                            this.loadGameState(); // Retry now that we're connected
+                        } else if (retries >= maxRetries) {
+                            clearInterval(waitForConnection);
+                            console.error('❌ Timeout waiting for NostrKV connection');
+                            ErrorHandler.showError('Failed to connect to NostrKV - please refresh');
+                        }
+                    }, 500);
+                    
+                    return;
+                }
+                
+                try {
+                    console.log('📡 Requesting game state from NostrKV...');
+                    const gameState = await nostrKVClient.getGameState(this.gameID);
+                    console.log('📥 Received game state:', gameState);
+                    
+                    if (!gameState) {
+                        console.error('❌ Game not found in NostrKV');
+                        ErrorHandler.showError('Game not found - please check the URL');
+                        this.showScreen('start-game-screen');
+                        return;
+                    }
+                    
+                    console.log('✅ Game state loaded successfully');
+                    console.log('Game admin:', gameState.admin);
+                    console.log('Game players:', gameState.players);
+                    console.log('Game state:', gameState.state);
+                    
+                    this.currentGameState = gameState;
+                    
+                    // Check if user is admin
+                    this.isAdmin = gameState.admin === this.userUUID;
+                    console.log('Am I admin?', this.isAdmin);
+                    
+                    // Check if user already joined
+                    const existingPlayer = gameState.players.find(p => p.uuid === this.userUUID);
+                    const hasJoined = !!existingPlayer;
+                    console.log('Have I joined?', hasJoined, 'existing player:', existingPlayer);
+                    
+                    // Handle completed games - show end screen directly
+                    if (gameState.state === 'completed') {
+                        console.log('🏁 Game is completed, showing end screen directly');
+                        this.showScreen('endgame-screen');
+                        this.showGameResults();
+                        return; // Don't start polling or show lobby
+                    }
+                    
+                    // Handle in-progress games - show gameplay screen directly
+                    if (gameState.state === 'in_progress') {
+                        console.log('🎮 Game is in progress, showing gameplay screen directly');
+                        this.showScreen('gameplay-screen');
+                        this.startGameplay();
+                        return; // Don't show lobby for active games
+                    }
+                    
+                    // For open games, show lobby as usual
+                    console.log('🎨 Updating game lobby UI...');
+                    this.updateGameLobby();
+                    
+                    // Show appropriate sections
+                    if (this.isAdmin) {
+                        console.log('👑 Showing admin controls');
+                        document.getElementById('admin-controls').classList.remove('hidden');
+                        document.getElementById('join-game-form').classList.add('hidden');
+                    } else if (!hasJoined && gameState.state === 'open') {
+                        console.log('📝 Showing join form');
+                        document.getElementById('join-game-form').classList.remove('hidden');
+                        document.getElementById('admin-controls').classList.add('hidden');
+                    } else {
+                        console.log('👀 Hiding all forms (already joined or game not open)');
+                        document.getElementById('join-game-form').classList.add('hidden');
+                        document.getElementById('admin-controls').classList.add('hidden');
+                    }
+                    
+                    // Start polling for updates
+                    console.log('🔄 Starting game state polling...');
+                    this.startGameStatePolling();
+                    
+                } catch (error) {
+                    console.error('❌ Failed to load game state:', error);
+                    ErrorHandler.handleNostrKVError(error);
+                }
+            }
+            
+            async handleCreateGame(event) {
+                event.preventDefault();
+                
+                const adminNpub = document.getElementById('admin-npub').value.trim();
+                const prizeToken = document.getElementById('prize-token').value.trim();
+                
+                // Validate inputs
+                if (!this.validateNpub(adminNpub)) {
+                    ErrorHandler.showError('Please enter a valid npub (starts with npub1)');
+                    return;
+                }
+                
+                if (!prizeToken) {
+                    ErrorHandler.showError('Please enter a prize token');
+                    return;
+                }
+                
+                if (prizeToken.length < 20) {
+                    ErrorHandler.showError('Prize token seems too short - please verify');
+                    return;
+                }
+                
+                try {
+                    // Disable form during creation
+                    this.setFormLoading('create-game-form', true);
+                    
+                    // Generate unique game ID
+                    this.gameID = this.generateGameID();
+                    this.isAdmin = true;
+                    
+                    // Create initial game state
+                    const gameState = {
+                        gameID: this.gameID,
+                        admin: this.userUUID,
+                        adminNpub: adminNpub,
+                        state: 'open',
+                        prize: prizeToken,
+                        createdAt: Date.now(),
+                        startedAt: null,
+                        endedAt: null,
+                        players: [{
+                            uuid: this.userUUID,
+                            npub: adminNpub,
+                            name: 'Admin',
+                            isAdmin: true,
+                            joinedAt: Date.now()
+                        }]
+                    };
+                    
+                    // Save to NostrKV
+                    await nostrKVClient.setGameState(this.gameID, gameState);
+                    this.currentGameState = gameState;
+                    
+                    // Update URL without page reload
+                    const newUrl = `${window.location.origin}${window.location.pathname}?game=${this.gameID}`;
+                    window.history.pushState({ gameID: this.gameID }, '', newUrl);
+                    
+                    // Switch to lobby screen
+                    this.showScreen('game-lobby-screen');
+                    this.updateGameLobby();
+                    this.startGameStatePolling();
+                    
+                    ErrorHandler.showSuccess(`Game created! ID: ${this.gameID}`);
+                    
+                } catch (error) {
+                    console.error('Game creation failed:', error);
+                    ErrorHandler.handleNostrKVError(error);
+                } finally {
+                    this.setFormLoading('create-game-form', false);
+                }
+            }
+            
+            generateGameID() {
+                // Generate a short, memorable game ID
+                const adjectives = ['fast', 'quick', 'wild', 'crazy', 'epic', 'mega', 'super', 'ultra'];
+                const nouns = ['flag', 'race', 'dash', 'rush', 'blitz', 'storm', 'flash', 'bolt'];
+                
+                const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+                const noun = nouns[Math.floor(Math.random() * nouns.length)];
+                const num = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+                
+                return `${adj}-${noun}-${num}`;
+            }
+            
+            validateNpub(npub) {
+                if (!npub || !npub.startsWith('npub1')) {
+                    return false;
+                }
+                
+                // Basic validation - just check format for demo
+                return npub.length > 10;
+            }
+            
+            setFormLoading(formId, loading) {
+                const form = document.getElementById(formId);
+                const inputs = form.querySelectorAll('input, textarea, button');
+                
+                inputs.forEach(input => {
+                    input.disabled = loading;
+                });
+                
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    if (loading) {
+                        submitBtn.dataset.originalText = submitBtn.textContent;
+                        submitBtn.textContent = 'Creating Game...';
+                    } else {
+                        submitBtn.textContent = submitBtn.dataset.originalText || 'Create Game';
+                    }
+                }
+            }
+            
+            async handleJoinGame() {
+                const playerNpub = document.getElementById('player-npub').value.trim();
+                const playerName = document.getElementById('player-name').value.trim();
+                
+                // Validate inputs
+                if (!this.validateNpub(playerNpub)) {
+                    ErrorHandler.showError('Please enter a valid npub (starts with npub1)');
+                    return;
+                }
+                
+                if (!playerName) {
+                    ErrorHandler.showError('Please enter a display name');
+                    return;
+                }
+                
+                if (playerName.length > 20) {
+                    ErrorHandler.showError('Display name must be 20 characters or less');
+                    return;
+                }
+                
+                try {
+                    const joinBtn = document.getElementById('join-game-btn');
+                    joinBtn.disabled = true;
+                    joinBtn.textContent = 'Joining...';
+                    
+                    // Get current game state
+                    const gameState = await nostrKVClient.getGameState(this.gameID);
+                    
+                    if (!gameState) {
+                        ErrorHandler.showError('Game not found - please check the URL');
+                        return;
+                    }
+                    
+                    if (gameState.state !== 'open') {
+                        ErrorHandler.showError('Game has already started or ended');
+                        return;
+                    }
+                    
+                    // Check if player already joined
+                    console.log('Checking for existing player...');
+                    console.log('My UUID:', this.userUUID);
+                    console.log('My npub:', playerNpub);
+                    console.log('Current players:', gameState.players);
+                    
+                    const existingPlayer = gameState.players.find(p => p.npub === playerNpub || p.uuid === this.userUUID);
+                    if (existingPlayer) {
+                        console.log('Found existing player:', existingPlayer);
+                        ErrorHandler.showError('You have already joined this game');
+                        return;
+                    }
+                    
+                    if (gameState.players.length >= 10) {
+                        ErrorHandler.showError('Game is full (maximum 10 players)');
+                        return;
+                    }
+                    
+                    // Add player to game
+                    const newPlayer = {
+                        uuid: this.userUUID,
+                        npub: playerNpub,
+                        name: playerName,
+                        isAdmin: false,
+                        joinedAt: Date.now()
+                    };
+                    
+                    gameState.players.push(newPlayer);
+                    console.log('Adding new player:', newPlayer);
+                    console.log('Updated players array:', gameState.players);
+                    
+                    // Save updated game state
+                    console.log('Saving updated game state...');
+                    await nostrKVClient.setGameState(this.gameID, gameState);
+                    this.currentGameState = gameState;
+                    console.log('Game state saved successfully');
+                    
+                    // Hide join form
+                    document.getElementById('join-game-form').classList.add('hidden');
+                    
+                    // Force UI update with new game state
+                    console.log('🔄 Forcing UI update after join...');
+                    this.updateGameLobby();
+                    
+                    ErrorHandler.showSuccess(`Joined game as ${playerName}!`);
+                    
+                } catch (error) {
+                    console.error('Join game failed:', error);
+                    ErrorHandler.handleNostrKVError(error);
+                } finally {
+                    const joinBtn = document.getElementById('join-game-btn');
+                    joinBtn.disabled = false;
+                    joinBtn.textContent = 'Join Game';
+                }
+            }
+            
+            async handleStartGame() {
+                try {
+                    console.log('🎮 handleStartGame() called');
+                    const startBtn = document.getElementById('start-game-btn');
+                    startBtn.disabled = true;
+                    startBtn.textContent = 'Starting Game...';
+                    
+                    // Stop polling temporarily to avoid rate limit conflicts
+                    console.log('Stopping polling to avoid rate limits...');
+                    this.stopGameStatePolling();
+                    
+                    // Wait a moment to ensure no pending requests
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    console.log('Getting current game state for:', this.gameID);
+                    // Get current game state with retry logic
+                    const gameState = await this.getGameStateWithRetry(this.gameID);
+                    
+                    if (!gameState) {
+                        ErrorHandler.showError('Game not found');
+                        return;
+                    }
+                    
+                    if (gameState.state !== 'open') {
+                        ErrorHandler.showError('Game has already started or ended');
+                        return;
+                    }
+                    
+                    if (gameState.players.length < 2) {
+                        ErrorHandler.showError('Need at least 2 players to start the game');
+                        return;
+                    }
+                    
+                    // Check if user is admin
+                    const userPlayer = gameState.players.find(p => p.uuid === this.userUUID);
+                    if (!userPlayer || !userPlayer.isAdmin) {
+                        ErrorHandler.showError('Only the game creator can start the game');
+                        return;
+                    }
+                    
+                    // Generate random game duration (45-78 seconds for engaging gameplay)
+                    const minDuration = 45 * 1000; // 45 seconds
+                    const maxDuration = 78 * 1000; // 78 seconds (average ~61.5 seconds)
+                    const gameDuration = minDuration + Math.random() * (maxDuration - minDuration);
+                    
+                    // Update game state to in_progress
+                    gameState.state = 'in_progress';
+                    gameState.startedAt = Date.now();
+                    gameState.duration = Math.floor(gameDuration);
+                    gameState.flagHolderHistory = []; // Track flag holder history (current + 2 previous)
+                    
+                    console.log('Starting game with state:', gameState);
+                    
+                    // Save updated game state with retry logic
+                    console.log('Saving game state to NostrKV...');
+                    await this.setGameStateWithRetry(this.gameID, gameState);
+                    this.currentGameState = gameState;
+                    console.log('Game state saved successfully');
+                    
+                    // Switch to gameplay screen and start gameplay
+                    console.log('Switching to gameplay screen...');
+                    this.showScreen('gameplay-screen');
+                    console.log('Starting gameplay...');
+                    this.startGameplay();
+                    console.log('Starting game timer for', gameState.duration, 'ms');
+                    this.startGameTimer(gameState.duration);
+                    
+                    console.log('✅ Game start completed successfully!');
+                    ErrorHandler.showSuccess('Game started! Good luck!');
+                    
+                } catch (error) {
+                    console.error('Start game failed:', error);
+                    ErrorHandler.handleNostrKVError(error);
+                } finally {
+                    const startBtn = document.getElementById('start-game-btn');
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Start Game';
+                }
+            }
+            
+            startGameStatePolling() {
+                // Clear any existing polling
+                this.stopGameStatePolling();
+                
+                console.log('Starting game state polling...');
+                
+                this.gameStatePoller = setInterval(async () => {
+                    try {
+                        await this.pollGameState();
+                    } catch (error) {
+                        console.error('Game state polling error:', error);
+                        // Don't show errors for polling failures unless connection is lost
+                        if (!nostrKVClient.connected) {
+                            ErrorHandler.handleNostrKVError(error);
+                        }
+                    }
+                }, this.pollingInterval);
+            }
+            
+            stopGameStatePolling() {
+                if (this.gameStatePoller) {
+                    clearInterval(this.gameStatePoller);
+                    this.gameStatePoller = null;
+                    console.log('Stopped game state polling');
+                }
+            }
+            
+            async pollGameState() {
+                if (!this.gameID) {
+                    return;
+                }
+                
+                try {
+                    const gameState = await nostrKVClient.getGameState(this.gameID);
+                
+                if (!gameState) {
+                    ErrorHandler.showError('Game no longer exists');
+                    this.stopGameStatePolling();
+                    this.showScreen('start-game-screen');
+                    return;
+                }
+                
+                // Check if game state changed
+                const stateChanged = !this.currentGameState || 
+                                   JSON.stringify(this.currentGameState) !== JSON.stringify(gameState);
+                
+                if (stateChanged) {
+                    console.log('Game state updated:', gameState.state);
+                    this.currentGameState = gameState;
+                    
+                    // Handle state transitions
+                    if (gameState.state === 'in_progress' && this.currentScreen === 'game-lobby-screen') {
+                        this.showScreen('gameplay-screen');
+                        this.startGameplay();
+                    } else if (gameState.state === 'completed') {
+                        this.showScreen('endgame-screen');
+                        this.stopGameStatePolling();
+                        this.showGameResults();
+                    } else {
+                        this.updateGameLobby();
+                    }
+                }
+                
+                } catch (error) {
+                    if (error.message.includes('Rate limit exceeded')) {
+                        console.log('Rate limit hit during lobby polling, backing off...');
+                        // Increase polling interval temporarily
+                        clearInterval(this.gameStatePoller);
+                        setTimeout(() => {
+                            if (this.gameStatePoller) {
+                                this.startGameStatePolling();
+                            }
+                        }, 3000); // Wait 3 seconds before resuming
+                    } else {
+                        console.error('Game state polling error:', error);
+                    }
+                }
+            }
+            
+            updateGameLobby() {
+                if (!this.currentGameState) {
+                    return;
+                }
+                
+                const gameState = this.currentGameState;
+                
+                // Update game ID display
+                document.getElementById('current-game-id').textContent = gameState.gameID;
+                
+                // Update player count and list
+                document.getElementById('player-count').textContent = gameState.players.length;
+                this.renderPlayersList(gameState.players);
+                
+                // Update game status
+                const statusText = {
+                    'open': 'Waiting for players',
+                    'in_progress': 'Game in progress',
+                    'completed': 'Game completed'
+                }[gameState.state] || 'Unknown';
+                
+                document.getElementById('game-status').textContent = statusText;
+                
+                // Show/hide sections based on user participation
+                const currentPlayer = gameState.players.find(p => p.uuid === this.userUUID);
+                const adminControls = document.getElementById('admin-controls');
+                const joinGameForm = document.getElementById('join-game-form');
+                const qrCodeSection = document.getElementById('qr-code-section');
+                
+                if (currentPlayer) {
+                    // User is in the game
+                    joinGameForm.classList.add('hidden');
+                    qrCodeSection.classList.remove('hidden');
+                    
+                    // Generate QR code
+                    this.generateQRCode();
+                    
+                    if (currentPlayer.isAdmin) {
+                        // User is admin
+                        this.isAdmin = true;
+                        adminControls.classList.remove('hidden');
+                        
+                        const startBtn = document.getElementById('start-game-btn');
+                        const canStart = gameState.players.length >= 2 && gameState.state === 'open';
+                        startBtn.disabled = !canStart;
+                        startBtn.textContent = canStart ? 'Start Game!' : `Need ${2 - gameState.players.length} more players`;
+                    } else {
+                        // User is regular player
+                        adminControls.classList.add('hidden');
+                    }
+                } else {
+                    // User is not in the game
+                    adminControls.classList.add('hidden');
+                    qrCodeSection.classList.add('hidden');
+                    if (gameState.state === 'open') {
+                        joinGameForm.classList.remove('hidden');
+                    } else {
+                        joinGameForm.classList.add('hidden');
+                    }
+                }
+            }
+            
+            renderPlayersList(players) {
+                const container = document.getElementById('players-container');
+                container.innerHTML = '';
+                
+                players.forEach((player, index) => {
+                    const playerItem = document.createElement('div');
+                    playerItem.className = 'player-item';
+                    
+                    // Create avatar with first letter of name
+                    const avatar = document.createElement('div');
+                    avatar.className = 'player-avatar';
+                    avatar.textContent = player.name.charAt(0).toUpperCase();
+                    if (player.isAdmin) {
+                        avatar.style.background = '#f56565'; // Red for admin
+                        avatar.title = 'Game Admin';
+                    }
+                    
+                    // Create player info
+                    const info = document.createElement('div');
+                    info.className = 'player-info';
+                    
+                    const nameElement = document.createElement('h4');
+                    nameElement.textContent = player.name + (player.isAdmin ? ' (Admin)' : '');
+                    
+                    const npubElement = document.createElement('p');
+                    npubElement.textContent = this.truncateNpub(player.npub);
+                    npubElement.title = player.npub;
+                    
+                    info.appendChild(nameElement);
+                    info.appendChild(npubElement);
+                    
+                    playerItem.appendChild(avatar);
+                    playerItem.appendChild(info);
+                    
+                    container.appendChild(playerItem);
+                });
+            }
+            
+            truncateNpub(npub) {
+                if (npub.length <= 16) return npub;
+                return `${npub.substring(0, 8)}...${npub.substring(npub.length - 8)}`;
+            }
+            
+            addCopyUrlButton() {
+                const adminControls = document.getElementById('admin-controls');
+                
+                // Check if button already exists
+                if (document.querySelector('#copy-url-btn')) {
+                    return;
+                }
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.id = 'copy-url-btn';
+                copyBtn.className = 'btn';
+                copyBtn.textContent = '📋 Copy Game URL';
+                copyBtn.style.marginLeft = '10px';
+                copyBtn.addEventListener('click', () => this.copyGameUrl());
+                
+                const container = document.querySelector('.container');
+                container.insertBefore(copyBtn, container.querySelector('.players-list'));
+            }
+            
+            copyGameUrl() {
+                const gameUrl = `${window.location.origin}${window.location.pathname}?game=${this.gameID}`;
+                
+                // Try to use modern clipboard API
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(gameUrl).then(() => {
+                        ErrorHandler.showSuccess('Game URL copied to clipboard!');
+                    }).catch(err => {
+                        console.error('Failed to copy URL:', err);
+                        this.fallbackCopyUrl(gameUrl);
+                    });
+                } else {
+                    this.fallbackCopyUrl(gameUrl);
+                }
+            }
+            
+            fallbackCopyUrl(url) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                
+                try {
+                    document.execCommand('copy');
+                    ErrorHandler.showSuccess('Game URL copied to clipboard!');
+                } catch (err) {
+                    console.error('Fallback copy failed:', err);
+                    ErrorHandler.showError('Failed to copy URL - please copy manually: ' + url);
+                }
+                
+                document.body.removeChild(textArea);
+            }
+            
+            handleCopyUrl() {
+                const gameUrlInput = document.getElementById('game-url-input');
+                const url = gameUrlInput.value;
+                
+                // Try to use modern clipboard API
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(url).then(() => {
+                        ErrorHandler.showSuccess('Game URL copied to clipboard!');
+                    }).catch(err => {
+                        console.error('Failed to copy URL:', err);
+                        this.fallbackCopyUrl(url);
+                    });
+                } else {
+                    this.fallbackCopyUrl(url);
+                }
+            }
+            
+            generateQRCode() {
+                // Prevent duplicate generation for the same game
+                const currentGameKey = `${this.gameID}`;
+                if (this.qrCodeGenerated === currentGameKey) {
+                    console.log('QR code already generated for this game');
+                    return;
+                }
+                
+                const gameUrl = `${window.location.origin}${window.location.pathname}?game=${this.gameID}`;
+                const canvas = document.getElementById('qr-code-canvas');
+                const urlInput = document.getElementById('game-url-input');
+                
+                // Set the URL in the input field
+                if (urlInput) {
+                    urlInput.value = gameUrl;
+                }
+                
+                if (!canvas) {
+                    console.error('QR code canvas not found');
+                    return;
+                }
+                
+                // Clean up any existing QR codes (prevent duplicates)
+                const existingQR = canvas.parentNode.querySelector('img, div[style*="border: 2px dashed"]');
+                if (existingQR) {
+                    existingQR.remove();
+                }
+                
+                // Clear the canvas if it was used before
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+                
+                // Mark as generated to prevent duplicates
+                this.qrCodeGenerated = currentGameKey;
+                
+                // Check if QRCode library is available
+                if (typeof QRCode === 'undefined') {
+                    console.error('QRCode library not loaded, using online QR generator');
+                    // Fallback: use online QR code generator
+                    canvas.style.display = 'none';
+                    const qrImg = document.createElement('img');
+                    const encodedUrl = encodeURIComponent(gameUrl);
+                    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedUrl}`;
+                    qrImg.alt = 'QR Code';
+                    qrImg.style.border = '2px solid #ddd';
+                    qrImg.style.borderRadius = '8px';
+                    qrImg.onerror = function() {
+                        // If online QR fails too, show URL text
+                        const fallbackDiv = document.createElement('div');
+                        fallbackDiv.innerHTML = `<p style="color: #666;">Scan this URL:<br><strong style="font-size: 12px; word-break: break-all;">${gameUrl}</strong></p>`;
+                        fallbackDiv.style.padding = '20px';
+                        fallbackDiv.style.border = '2px dashed #ccc';
+                        fallbackDiv.style.borderRadius = '8px';
+                        fallbackDiv.style.textAlign = 'center';
+                        fallbackDiv.style.maxWidth = '200px';
+                        this.parentNode.replaceChild(fallbackDiv, this);
+                    };
+                    canvas.parentNode.insertBefore(qrImg, canvas.nextSibling);
+                    return;
+                }
+                
+                // Generate QR code
+                QRCode.toCanvas(canvas, gameUrl, {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                }, function (error) {
+                    if (error) {
+                        console.error('QR Code generation failed:', error);
+                        ErrorHandler.showError('Failed to generate QR code');
+                    } else {
+                        console.log('QR Code generated successfully for:', gameUrl);
+                    }
+                });
+            }
+            
+            async getGameStateWithRetry(gameID, maxRetries = 3) {
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        console.log(`Attempt ${attempt}/${maxRetries} to get game state`);
+                        const gameState = await nostrKVClient.getGameState(gameID);
+                        console.log('Successfully retrieved game state');
+                        return gameState;
+                    } catch (error) {
+                        if (error.message.includes('Rate limit exceeded')) {
+                            const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+                            console.log(`Rate limit hit, waiting ${delay}ms before retry ${attempt}/${maxRetries}`);
+                            
+                            if (attempt < maxRetries) {
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                            } else {
+                                throw new Error('Unable to get game state after multiple retries due to rate limiting');
+                            }
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+            }
+            
+            async setGameStateWithRetry(gameID, gameState, maxRetries = 3) {
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        console.log(`Attempt ${attempt}/${maxRetries} to set game state`);
+                        const result = await nostrKVClient.setGameState(gameID, gameState);
+                        console.log('Successfully saved game state');
+                        return result;
+                    } catch (error) {
+                        if (error.message.includes('Rate limit exceeded')) {
+                            const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+                            console.log(`Rate limit hit, waiting ${delay}ms before retry ${attempt}/${maxRetries}`);
+                            
+                            if (attempt < maxRetries) {
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                            } else {
+                                throw new Error('Unable to save game state after multiple retries due to rate limiting');
+                            }
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+            }
+            
+            // Placeholder methods for later workpackages
+            startGameplayPolling() {
+                // Stop any existing polling
+                if (this.gameplayPoller) {
+                    clearInterval(this.gameplayPoller);
+                }
+                
+                console.log('Starting gameplay polling at', this.gameplayPollingInterval, 'ms intervals');
+                
+                // Poll every 500ms during gameplay for responsive experience
+                this.gameplayPoller = setInterval(async () => {
+                    try {
+                        await this.pollGameplayState();
+                    } catch (error) {
+                        console.error('Gameplay polling error:', error);
+                    }
+                }, this.gameplayPollingInterval);
+            }
+            
+            stopGameplayPolling() {
+                if (this.gameplayPoller) {
+                    clearInterval(this.gameplayPoller);
+                    this.gameplayPoller = null;
+                    console.log('Stopped gameplay polling');
+                }
+            }
+            
+            async pollGameplayState() {
+                if (!this.gameID) {
+                    return;
+                }
+                
+                // Rate limiting: ensure minimum interval between polls
+                const now = Date.now();
+                if (now - this.lastPollTime < this.minPollInterval) {
+                    console.log('Skipping poll due to rate limiting');
+                    return;
+                }
+                this.lastPollTime = now;
+                
+                try {
+                    const gameState = await nostrKVClient.getGameState(this.gameID);
+                    
+                    if (!gameState) {
+                        ErrorHandler.showError('Game no longer exists');
+                        this.stopGameplayPolling();
+                        this.showScreen('start-game-screen');
+                        return;
+                    }
+                    
+                    // Update current game state
+                    this.currentGameState = gameState;
+                    
+                    // Handle game ending
+                    if (gameState.state === 'completed') {
+                        this.stopGameplayPolling();
+                        this.stopGameTimer();
+                        this.showScreen('endgame-screen');
+                        this.showGameResults();
+                        return;
+                    }
+                    
+                    // Get current flag holder from dedicated key
+                    try {
+                        const flagHolder = await nostrKVClient.getFlagHolder(this.gameID);
+                        console.log('Current flag holder from polling:', flagHolder);
+                        this.currentFlagHolder = flagHolder;
+                    } catch (error) {
+                        console.warn('Could not get flag holder:', error);
+                        this.currentFlagHolder = null;
+                    }
+                    
+                    // Update gameplay UI with flag holder info
+                    this.updateGameplayUI(gameState);
+                    
+                } catch (error) {
+                    if (error.message.includes('Rate limit exceeded')) {
+                        console.log('Rate limit hit during gameplay polling, backing off...');
+                        // Double the polling interval temporarily
+                        clearInterval(this.gameplayPoller);
+                        setTimeout(() => {
+                            if (this.gameplayPoller) {
+                                this.startGameplayPolling();
+                            }
+                        }, 5000); // Wait 5 seconds before resuming
+                    } else {
+                        console.error('Gameplay polling error:', error);
+                    }
+                }
+            }
+            
+            startGameTimer(duration) {
+                console.log('Starting game timer for', duration, 'ms');
+                
+                // Prevent multiple timers
+                if (this.gameTimer) {
+                    console.log('Game timer already running, stopping old timer first');
+                    clearInterval(this.gameTimer);
+                }
+                
+                const endTime = Date.now() + duration;
+                
+                this.gameTimer = setInterval(() => {
+                    const remaining = Math.max(0, endTime - Date.now());
+                    this.updateTimerDisplay(remaining);
+                    
+                    if (remaining <= 0) {
+                        this.stopGameTimer();
+                        this.updateTimerDisplay(0); // Ensure timer shows 00:00
+                        console.log('⏰ Timer expired, ending game...');
+                        // Give a moment for any final updates to sync before showing results
+                        setTimeout(() => {
+                            console.log('⏰ Executing endGame after delay...');
+                            this.endGame();
+                        }, 1000);
+                    }
+                }, 1000); // Update every second
+            }
+            
+            stopGameTimer() {
+                if (this.gameTimer) {
+                    clearInterval(this.gameTimer);
+                    this.gameTimer = null;
+                }
+            }
+            
+            updateTimerDisplay(remaining) {
+                const minutes = Math.floor(remaining / 60000);
+                const seconds = Math.floor((remaining % 60000) / 1000);
+                const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                const timerElement = document.getElementById('game-timer');
+                if (timerElement) {
+                    timerElement.textContent = display;
+                }
+                
+                // Add warning colors in final 30 seconds
+                if (remaining <= 30000 && timerElement) {
+                    timerElement.style.color = remaining <= 10000 ? '#ff0000' : '#ff6600';
+                } else if (timerElement) {
+                    timerElement.style.color = '';
+                }
+            }
+            
+            async endGame() {
+                console.log('🏁 endGame() called');
+                try {
+                    this.stopGameTimer();
+                    this.stopGameplayPolling();
+                    this.gameplayStarted = false; // Reset for next game
+                    
+                    console.log('🏁 Current game state:', this.currentGameState?.state);
+                    const gameState = this.currentGameState;
+                    if (!gameState || gameState.state !== 'in_progress') {
+                        console.log('🏁 Game state invalid for ending:', gameState?.state);
+                        return;
+                    }
+                    
+                    // Set game state to completed
+                    gameState.state = 'completed';
+                    gameState.completedAt = Date.now();
+                    
+                    // Determine winner using multiple sources for reliability (same logic as showGameResults)
+                    let winner = null;
+                    
+                    // First try to get from NostrKV flag holder key
+                    try {
+                        const finalFlagHolder = await nostrKVClient.getFlagHolder(this.gameID);
+                        if (finalFlagHolder) {
+                            winner = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
+                            console.log('🏁 Found winner from NostrKV flag holder:', winner);
+                        }
+                    } catch (error) {
+                        console.warn('Could not get final flag holder from NostrKV:', error);
+                    }
+                    
+                    // If no winner from NostrKV, check flag holder history as backup
+                    if (!winner && gameState.flagHolderHistory && gameState.flagHolderHistory.length > 0) {
+                        const finalFlagHolder = gameState.flagHolderHistory[0]; // Most recent holder
+                        winner = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
+                        console.log('🏁 Found winner from flag holder history:', winner);
+                    }
+                    
+                    gameState.winner = winner;
+                    
+                    console.log('🏁 Ending game, winner:', winner);
+                    
+                    // Save final game state with retry logic
+                    console.log('🏁 Saving final game state...');
+                    await this.setGameStateWithRetry(this.gameID, gameState);
+                    console.log('🏁 Final game state saved, transitioning to end screen...');
+                    
+                    // Transition to end screen
+                    this.showScreen('endgame-screen');
+                    this.showGameResults();
+                    console.log('🏁 Game ended successfully!');
+                    
+                } catch (error) {
+                    console.error('🏁 Error ending game:', error);
+                }
+            }
+            
+            startGameplay() {
+                console.log('Starting gameplay...');
+                
+                // Prevent multiple calls
+                if (this.gameplayStarted) {
+                    console.log('Gameplay already started, skipping...');
+                    return;
+                }
+                this.gameplayStarted = true;
+                
+                if (!this.currentGameState) {
+                    ErrorHandler.showError('No game state available');
+                    return;
+                }
+                
+                // CRITICAL: Stop lobby polling to prevent rate limits
+                console.log('Stopping lobby polling before gameplay starts');
+                this.stopGameStatePolling();
+                
+                // Set up flag capture button listener with more debugging
+                console.log('Setting up flag capture button...');
+                const captureBtn = document.getElementById('capture-flag-btn');
+                console.log('Found capture button:', captureBtn);
+                
+                if (captureBtn) {
+                    // Remove existing listeners by cloning the button
+                    const newCaptureBtn = captureBtn.cloneNode(true);
+                    captureBtn.parentNode.replaceChild(newCaptureBtn, captureBtn);
+                    
+                    // Add fresh event listener with more debugging
+                    const handleClick = () => {
+                        console.log('🚨 Flag capture button clicked!');
+                        this.handleFlagCapture();
+                    };
+                    
+                    newCaptureBtn.addEventListener('click', handleClick);
+                    console.log('Flag capture button event listener set up successfully');
+                    
+                    // Test the button immediately
+                    console.log('Button disabled?', newCaptureBtn.disabled);
+                    console.log('Button text:', newCaptureBtn.textContent);
+                    console.log('Button style display:', newCaptureBtn.style.display);
+                    console.log('Button computed style:', window.getComputedStyle(newCaptureBtn));
+                    console.log('Button pointer-events:', window.getComputedStyle(newCaptureBtn).pointerEvents);
+                    console.log('Button z-index:', window.getComputedStyle(newCaptureBtn).zIndex);
+                    
+                    // Also try onclick as backup
+                    newCaptureBtn.onclick = handleClick;
+                    
+                } else {
+                    console.error('❌ Could not find capture-flag-btn element!');
+                }
+                
+                // Initialize gameplay UI
+                this.updateGameplayUI(this.currentGameState);
+                
+                // Start polling for real-time updates
+                this.startGameplayPolling();
+                
+                // Start the game timer if we have duration
+                if (this.currentGameState.duration) {
+                    const elapsed = Date.now() - this.currentGameState.startedAt;
+                    const remaining = this.currentGameState.duration - elapsed;
+                    
+                    if (remaining > 0) {
+                        this.startGameTimer(remaining);
+                    } else {
+                        // Game time has already expired
+                        this.endGame();
+                    }
+                }
+            }
+            
+            async handleFlagCapture() {
+                try {
+                    console.log('🏴 Flag capture attempt by:', this.userUUID);
+                    
+                    // Check if game is still active
+                    if (!this.currentGameState || this.currentGameState.state !== 'in_progress') {
+                        ErrorHandler.showError('Game is no longer active');
+                        return;
+                    }
+                    
+                    // Check cooldown to prevent spam
+                    const now = Date.now();
+                    if (now - this.lastCaptureAttempt < this.captureAttemptCooldown) {
+                        const remaining = Math.ceil((this.captureAttemptCooldown - (now - this.lastCaptureAttempt)) / 1000);
+                        console.log(`Capture attempt blocked by cooldown. ${remaining}s remaining`);
+                        ErrorHandler.showError(`Wait ${remaining}s before trying again`);
+                        return;
+                    }
+                    
+                    this.lastCaptureAttempt = now;
+                    
+                    const captureBtn = document.getElementById('capture-flag-btn');
+                    if (!captureBtn) {
+                        console.error('Capture button not found');
+                        return;
+                    }
+                    
+                    captureBtn.disabled = true;
+                    captureBtn.textContent = 'Capturing...';
+                    console.log('Capture button disabled, starting capture process...');
+                    
+                    // Get current game state to validate game is active
+                    console.log('Getting game state for validation...');
+                    const gameState = await this.getGameStateWithRetry(this.gameID);
+                    
+                    if (!gameState || gameState.state !== 'in_progress') {
+                        console.error('Game state invalid:', gameState?.state);
+                        ErrorHandler.showError('Game is not active');
+                        return;
+                    }
+                    
+                    // Find the current player
+                    const currentPlayer = gameState.players.find(p => p.uuid === this.userUUID);
+                    if (!currentPlayer) {
+                        console.error('Player not found in game. My UUID:', this.userUUID, 'Players:', gameState.players);
+                        ErrorHandler.showError('Player not found in game');
+                        return;
+                    }
+                    console.log('Found current player:', currentPlayer);
+                    
+                    // Get current flag holder from dedicated NostrKV key
+                    console.log('Getting current flag holder...');
+                    let currentFlagHolder;
+                    try {
+                        currentFlagHolder = await nostrKVClient.getFlagHolder(this.gameID);
+                        console.log('Current flag holder:', currentFlagHolder);
+                    } catch (error) {
+                        console.warn('Could not get current flag holder:', error);
+                        currentFlagHolder = null;
+                    }
+                    
+                    // Check if player already holds the flag  
+                    if (currentFlagHolder && currentFlagHolder.playerUUID === this.userUUID) {
+                        console.log('Player already holds the flag');
+                        ErrorHandler.showError('You already hold the flag!');
+                        return;
+                    }
+                    
+                    // Create flag holder object with all necessary data
+                    const newFlagHolder = {
+                        playerUUID: this.userUUID,
+                        playerName: currentPlayer.name,
+                        playerNpub: currentPlayer.npub,
+                        timestamp: now,
+                        captureId: `${this.userUUID}-${now}`
+                    };
+                    
+                    console.log('Setting new flag holder:', newFlagHolder);
+                    
+                    // Set flag holder in dedicated NostrKV key with retry
+                    try {
+                        await this.setFlagHolderWithRetry(this.gameID, newFlagHolder);
+                        console.log('✅ Flag holder set successfully in NostrKV');
+                    } catch (error) {
+                        console.error('❌ Failed to set flag holder:', error);
+                        throw error;
+                    }
+                    
+                    // Update flag holder history in game state (keep current + 2 previous)
+                    if (!gameState.flagHolderHistory) gameState.flagHolderHistory = [];
+                    
+                    // Add new holder to front of history
+                    gameState.flagHolderHistory.unshift(newFlagHolder);
+                    
+                    // Keep only the 3 most recent (current + 2 previous)
+                    if (gameState.flagHolderHistory.length > 3) {
+                        gameState.flagHolderHistory = gameState.flagHolderHistory.slice(0, 3);
+                    }
+                    
+                    console.log('🏴 Flag captured by:', currentPlayer.name);
+                    console.log('Saving updated game state...');
+                    
+                    // Save updated game state with player stats
+                    try {
+                        await this.setGameStateWithRetry(this.gameID, gameState);
+                        this.currentGameState = gameState;
+                        console.log('✅ Game state updated successfully');
+                    } catch (error) {
+                        console.error('❌ Failed to update game state:', error);
+                        // Don't throw here - flag holder was set, just game state update failed
+                    }
+                    
+                    // Store current flag holder locally for immediate UI update
+                    this.currentFlagHolder = newFlagHolder;
+                    
+                    // Update UI immediately
+                    this.updateGameplayUI(gameState);
+                    
+                    ErrorHandler.showSuccess(`🏴 Flag captured by ${currentPlayer.name}!`);
+                    
+                } catch (error) {
+                    console.error('❌ Flag capture failed:', error);
+                    if (error.message.includes('Rate limit exceeded')) {
+                        ErrorHandler.showError('Server busy - try again in a moment');
+                    } else if (error.message.includes('timeout')) {
+                        ErrorHandler.showError('Connection timeout - try again');
+                    } else {
+                        ErrorHandler.showError('Capture failed - please try again');
+                    }
+                } finally {
+                    // Reset button with cooldown
+                    setTimeout(() => {
+                        const captureBtn = document.getElementById('capture-flag-btn');
+                        if (captureBtn) {
+                            captureBtn.disabled = false;
+                            
+                            // Check current flag holder status to set correct text
+                            const isCurrentHolder = this.currentFlagHolder && this.currentFlagHolder.playerUUID === this.userUUID;
+                            captureBtn.textContent = isCurrentHolder ? 'YOU HOLD THE FLAG!' : 'CAPTURE FLAG!';
+                            console.log('Capture button reset. Is current holder:', isCurrentHolder);
+                        }
+                    }, this.captureAttemptCooldown);
+                }
+            }
+            
+            async setFlagHolderWithRetry(gameID, flagHolderObject, maxRetries = 3) {
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        console.log(`Attempt ${attempt}/${maxRetries} to set flag holder`);
+                        const result = await nostrKVClient.setFlagHolder(gameID, flagHolderObject);
+                        console.log('Flag holder set successfully');
+                        return result;
+                    } catch (error) {
+                        if (error.message.includes('Rate limit exceeded') || error.message.includes('timeout')) {
+                            const delay = attempt * 1500; // Exponential backoff: 1.5s, 3s, 4.5s
+                            console.log(`Request failed, waiting ${delay}ms before retry ${attempt}/${maxRetries}`);
+                            
+                            if (attempt < maxRetries) {
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                            } else {
+                                throw new Error('Unable to set flag holder after multiple retries: ' + error.message);
+                            }
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+            }
+            
+            updateGameplayUI(gameState) {
+                if (!gameState) return;
+                
+                console.log('🔄 Updating gameplay UI. Current flag holder:', this.currentFlagHolder);
+                
+                // Update flag holder display using the dedicated flag holder data
+                const flagHolderElement = document.getElementById('current-flag-holder');
+                if (flagHolderElement) {
+                    const holderName = this.currentFlagHolder ? this.currentFlagHolder.playerName : 'None';
+                    flagHolderElement.textContent = holderName;
+                    console.log('Updated flag holder display to:', holderName);
+                }
+                
+                // Update leaderboard to show current + 2 previous holders
+                const leaderboardContainer = document.getElementById('leaderboard-container');
+                if (leaderboardContainer && gameState.flagHolderHistory) {
+                    leaderboardContainer.innerHTML = '';
+                    
+                    if (gameState.flagHolderHistory.length === 0) {
+                        leaderboardContainer.innerHTML = '<div class="leaderboard-item">No flag captures yet</div>';
+                    } else {
+                        gameState.flagHolderHistory.forEach((holder, index) => {
+                            const item = document.createElement('div');
+                            item.className = 'leaderboard-item';
+                            
+                            const timeSince = Date.now() - holder.timestamp;
+                            const timeText = timeSince < 60000 ? 
+                                `${Math.floor(timeSince / 1000)}s ago` : 
+                                `${Math.floor(timeSince / 60000)}m ago`;
+                            
+                            let statusText = '';
+                            if (index === 0) {
+                                statusText = '👑 Current Holder';
+                                item.classList.add('current-holder');
+                            } else if (index === 1) {
+                                statusText = 'Previous Holder';
+                            } else {
+                                statusText = 'Previous Holder';
+                            }
+                            
+                            item.innerHTML = `
+                                <span class="rank">${index + 1}.</span>
+                                <span class="name">${holder.playerName}</span>
+                                <span class="captures">${statusText}</span>
+                                <span class="time">${timeText}</span>
+                            `;
+                            
+                            leaderboardContainer.appendChild(item);
+                        });
+                    }
+                }
+                
+                // Update capture button state using dedicated flag holder data
+                const captureBtn = document.getElementById('capture-flag-btn');
+                if (captureBtn) {
+                    const isCurrentHolder = this.currentFlagHolder && this.currentFlagHolder.playerUUID === this.userUUID;
+                    captureBtn.disabled = isCurrentHolder;
+                    captureBtn.textContent = isCurrentHolder ? 'YOU HOLD THE FLAG!' : 'CAPTURE FLAG!';
+                    
+                    console.log('Capture button state - Is current holder:', isCurrentHolder);
+                    
+                    if (isCurrentHolder) {
+                        captureBtn.classList.add('flag-holder');
+                    } else {
+                        captureBtn.classList.remove('flag-holder');
+                    }
+                }
+            }
+            
+            async showGameResults() {
+                console.log('Showing game results...');
+                
+                try {
+                    // Get final game state to determine winner
+                    let gameState = this.currentGameState;
+                    if (!gameState || gameState.state !== 'completed') {
+                        // If state isn't completed yet, try to get latest state
+                        gameState = await nostrKVClient.getGameState(this.gameID);
+                    }
+                    
+                    if (!gameState) {
+                        console.error('No game state available for results');
+                        return;
+                    }
+                    
+                    // Determine winner from multiple sources for reliability
+                    console.log('🔍 Game state winner:', gameState.winner);
+                    console.log('🔍 Flag holder history:', gameState.flagHolderHistory);
+                    console.log('🔍 Players:', gameState.players);
+                    
+                    let winner = gameState.winner;
+                    
+                    // If no winner in game state, check flag holder history as backup
+                    if (!winner && gameState.flagHolderHistory && gameState.flagHolderHistory.length > 0) {
+                        const finalFlagHolder = gameState.flagHolderHistory[0]; // Most recent holder
+                        console.log('🔍 Final flag holder from history:', finalFlagHolder);
+                        winner = gameState.players.find(p => p.uuid === finalFlagHolder.playerUUID);
+                        console.log('🔍 Found winner from flag holder history:', winner);
+                    }
+                    
+                    // If still no winner, try to get from NostrKV flag holder key
+                    if (!winner) {
+                        try {
+                            const flagHolder = await nostrKVClient.getFlagHolder(this.gameID);
+                            console.log('🔍 Flag holder from NostrKV:', flagHolder);
+                            if (flagHolder) {
+                                winner = gameState.players.find(p => p.uuid === flagHolder.playerUUID);
+                                console.log('🔍 Found winner from NostrKV flag holder:', winner);
+                            }
+                        } catch (error) {
+                            console.warn('Could not get flag holder from NostrKV:', error);
+                        }
+                    }
+                    
+                    console.log('🔍 Final determined winner:', winner);
+                    
+                    // Update winner display
+                    const winnerElement = document.getElementById('final-winner');
+                    if (winnerElement) {
+                        if (winner) {
+                            winnerElement.textContent = `${winner.name} 🏁`;
+                        } else {
+                            winnerElement.textContent = 'No flag holder - No winner!';
+                        }
+                    }
+                    
+                    // Update prize status - different message for winner vs others
+                    const prizeStatusElement = document.getElementById('prize-status');
+                    if (prizeStatusElement) {
+                        if (winner) {
+                            if (winner.uuid === this.userUUID) {
+                                // Current user is the winner - they'll see the prize token
+                                prizeStatusElement.textContent = 'Congratulations! 🎉';
+                            } else {
+                                // Someone else won
+                                prizeStatusElement.textContent = `${winner.name} has won the prize! 👑`;
+                            }
+                        } else {
+                            prizeStatusElement.textContent = 'No winner - no one held the flag at game end';
+                        }
+                    }
+                    
+                    // Update final leaderboard
+                    this.updateFinalLeaderboard(gameState);
+                    
+                    // Add game statistics
+                    this.displayGameStats(gameState);
+                    
+                    // Show winner celebration if current user won
+                    if (winner && winner.uuid === this.userUUID) {
+                        this.showWinnerCelebration();
+                    }
+                    
+                    // Show prize token to winner only
+                    if (winner && winner.uuid === this.userUUID && gameState.prize) {
+                        this.displayPrizeToWinner(winner, gameState.prize);
+                    }
+                    
+                    console.log('Game results displayed. Winner:', winner?.name);
+                    
+                } catch (error) {
+                    console.error('Error showing game results:', error);
+                    const winnerElement = document.getElementById('final-winner');
+                    if (winnerElement) {
+                        winnerElement.textContent = 'Error loading results';
+                    }
+                }
+            }
+            
+            updateFinalLeaderboard(gameState) {
+                const leaderboardContainer = document.getElementById('final-leaderboard');
+                if (!leaderboardContainer) {
+                    return;
+                }
+                
+                leaderboardContainer.innerHTML = '';
+                
+                // Show final flag holder history (current + previous holders)
+                if (!gameState.flagHolderHistory || gameState.flagHolderHistory.length === 0) {
+                    leaderboardContainer.innerHTML = '<div class="leaderboard-item">No flag captures during game</div>';
+                    return;
+                }
+                
+                gameState.flagHolderHistory.forEach((holder, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'leaderboard-item';
+                    
+                    if (index === 0) {
+                        item.style.background = '#fff3cd';
+                        item.style.borderLeftColor = '#ffc107';
+                        item.style.fontWeight = 'bold';
+                    }
+                    
+                    const captureTime = new Date(holder.timestamp).toLocaleTimeString();
+                    
+                    let statusText = '';
+                    if (index === 0) {
+                        statusText = '🏆 Final Holder (Winner)';
+                    } else if (index === 1) {
+                        statusText = 'Previous Holder';
+                    } else {
+                        statusText = 'Earlier Holder';
+                    }
+                    
+                    item.innerHTML = `
+                        <span class="rank">${index + 1}.</span>
+                        <span class="name">${holder.playerName}</span>
+                        <span class="captures">${statusText}</span>
+                        <span class="time">${captureTime}</span>
+                    `;
+                    
+                    leaderboardContainer.appendChild(item);
+                });
+            }
+            
+            handleNewGame() {
+                // Reset state and go to start screen
+                this.stopGameStatePolling();
+                this.stopGameplayPolling();
+                this.stopGameTimer();
+                this.gameID = null;
+                this.currentGameState = null;
+                this.isAdmin = false;
+                this.qrCodeGenerated = false;
+                this.gameplayStarted = false;
+                
+                // Update URL to remove game parameter
+                window.history.pushState({}, '', window.location.pathname);
+                
+                // Show start screen
+                this.showScreen('start-game-screen');
+            }
+            
+            handleJoinAnother() {
+                // For now, same behavior as new game
+                this.handleNewGame();
+            }
+            
+            displayPrizeToWinner(winner, prizeToken) {
+                if (!winner || !prizeToken) {
+                    return;
+                }
+                
+                try {
+                    if (!this.prizeDistributor) {
+                        this.prizeDistributor = new PrizeDistributor(nostrKVClient);
+                    }
+                    
+                    this.prizeDistributor.displayPrizeToWinner(
+                        winner, 
+                        prizeToken, 
+                        this.gameID
+                    );
+                    
+                    console.log('🏆 Prize displayed to winner');
+                    
+                } catch (error) {
+                    console.error('🏆 Failed to display prize:', error);
+                    ErrorHandler.showError('Failed to display prize token');
+                }
+            }
+            
+            showWinnerCelebration() {
+                // Create celebration effect for winner
+                const celebration = document.createElement('div');
+                celebration.className = 'winner-celebration';
+                celebration.innerHTML = `
+                    <div class="celebration-content">
+                        <div class="celebration-icon">🎉</div>
+                        <div class="celebration-text">YOU WON!</div>
+                        <div class="celebration-subtext">Prize incoming...</div>
+                    </div>
+                `;
+                
+                document.body.appendChild(celebration);
+                
+                // Remove after animation
+                setTimeout(() => {
+                    if (celebration.parentNode) {
+                        celebration.parentNode.removeChild(celebration);
+                    }
+                }, 4000);
+            }
+            
+            displayGameStats(gameState) {
+                const stats = {
+                    duration: (gameState.completedAt || Date.now()) - gameState.startedAt,
+                    totalPlayers: gameState.players.length,
+                    totalCaptures: gameState.flagHolderHistory ? gameState.flagHolderHistory.length : 0
+                };
+                
+                // Add stats display if not already present
+                const endgameScreen = document.getElementById('endgame-screen');
+                let statsElement = endgameScreen.querySelector('.game-stats');
+                
+                if (!statsElement) {
+                    statsElement = document.createElement('div');
+                    statsElement.className = 'game-stats';
+                    
+                    const container = endgameScreen.querySelector('.container');
+                    const leaderboard = container.querySelector('.final-leaderboard');
+                    if (leaderboard) {
+                        leaderboard.parentNode.insertBefore(statsElement, leaderboard);
+                    } else {
+                        container.appendChild(statsElement);
+                    }
+                }
+                
+                const durationText = this.formatDuration(stats.duration);
+                
+                statsElement.innerHTML = `
+                    <h4>📊 Game Statistics</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">${durationText}</div>
+                            <div class="stat-label">Game Duration</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.totalPlayers}</div>
+                            <div class="stat-label">Total Players</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.totalCaptures}</div>
+                            <div class="stat-label">Flag Captures</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${gameState.gameID}</div>
+                            <div class="stat-label">Game ID</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            formatDuration(milliseconds) {
+                const seconds = Math.floor(milliseconds / 1000);
+                if (seconds < 60) {
+                    return `${seconds}s`;
+                } else {
+                    const minutes = Math.floor(seconds / 60);
+                    const remainingSeconds = seconds % 60;
+                    return `${minutes}m ${remainingSeconds}s`;
+                }
+            }
+        }
+
+        // Prize Distribution Class
+        class PrizeDistributor {
+            constructor(nostrKVClient) {
+                this.nostrKVClient = nostrKVClient;
+            }
+            
+            displayPrizeToWinner(winner, prizeToken, gameID) {
+                if (!winner || !prizeToken) {
+                    return;
+                }
+                
+                console.log(`🏆 Displaying prize to winner: ${winner.name}`);
+                
+                // Show prize token with copy functionality
+                this.showPrizeToken(prizeToken);
+                this.updatePrizeStatus('Prize ready to claim! 🎉');
+                
+                console.log('🏆 Prize displayed successfully');
+                return true;
+            }
+            
+            showPrizeToken(prizeToken) {
+                // Create or update prize token display
+                let prizeContainer = document.getElementById('prize-token-container');
+                if (!prizeContainer) {
+                    prizeContainer = document.createElement('div');
+                    prizeContainer.id = 'prize-token-container';
+                    prizeContainer.className = 'prize-token-container';
+                    
+                    // Insert after winner display
+                    const winnerElement = document.getElementById('final-winner');
+                    if (winnerElement && winnerElement.parentNode) {
+                        winnerElement.parentNode.insertBefore(prizeContainer, winnerElement.nextSibling);
+                    }
+                }
+                
+                prizeContainer.innerHTML = `
+                    <div class="prize-token-header">
+                        <h3>🎁 Your Prize Token</h3>
+                        <p>Cashu token - click to copy and redeem!</p>
+                    </div>
+                    <div class="prize-token-display">
+                        <input type="text" id="prize-token-text" value="${prizeToken}" readonly class="prize-token-input">
+                        <button id="copy-prize-btn" class="btn success">Copy Token</button>
+                    </div>
+                    <div class="prize-token-footer">
+                        <small>Keep this token safe - it represents your prize!</small>
+                    </div>
+                `;
+                
+                // Add copy functionality
+                const copyBtn = document.getElementById('copy-prize-btn');
+                const tokenInput = document.getElementById('prize-token-text');
+                
+                copyBtn.addEventListener('click', () => {
+                    tokenInput.select();
+                    tokenInput.setSelectionRange(0, 99999); // For mobile devices
+                    
+                    try {
+                        document.execCommand('copy');
+                        copyBtn.textContent = 'Copied! ✅';
+                        copyBtn.style.background = '#48bb78';
+                        
+                        // Reset button after 2 seconds
+                        setTimeout(() => {
+                            copyBtn.textContent = 'Copy Token';
+                            copyBtn.style.background = '';
+                        }, 2000);
+                        
+                        console.log('🎁 Prize token copied to clipboard');
+                    } catch (error) {
+                        console.error('Failed to copy prize token:', error);
+                        copyBtn.textContent = 'Copy Failed';
+                        setTimeout(() => {
+                            copyBtn.textContent = 'Copy Token';
+                        }, 2000);
+                    }
+                });
+            }
+            
+            updatePrizeStatus(status) {
+                const statusElement = document.getElementById('prize-status');
+                if (statusElement) {
+                    statusElement.textContent = status;
+                    
+                    // Add appropriate CSS class based on status
+                    statusElement.className = '';
+                    if (status.includes('sent') || status.includes('Check your')) {
+                        statusElement.classList.add('prize-success');
+                    } else if (status.includes('failed')) {
+                        statusElement.classList.add('prize-error');
+                    } else {
+                        statusElement.classList.add('prize-pending');
+                    }
+                }
+            }
+        }
+
+        // NostrKV Connect Client Class
+        class BetchaNostrKVClient {
+            constructor() {
+                this.config = null;
+                this.pool = null;
+                this.subscription = null;
+                this.connected = false;
+                this.pendingRequests = new Map();
+                this.processedEvents = new Set();
+                this.connectionTimeout = 30000;
+                this.minRequestInterval = 1000; // 1 second for game responsiveness
+            }
+            
+            async initialize() {
+                try {
+                    console.log('Initializing NostrKV Connect...');
+                    
+                    // Load connection string from external config
+                    if (!window.BetchaConfig || !window.BetchaConfig.nostrKVConnectionString) {
+                        throw new Error('Configuration not found. Please ensure config.js exists and contains valid connection string. See config.js.example for setup instructions.');
+                    }
+                    
+                    const connectionString = window.BetchaConfig.nostrKVConnectionString;
+                    console.log('Loaded connection string from config.js');
+                    
+                    console.log('Parsing connection string...');
+                    await this.parseConnectionString(connectionString);
+                    
+                    console.log('Connecting to relays...');
+                    await this.connectToRelays();
+                    
+                    console.log('NostrKV Connect initialized successfully');
+                    this.updateConnectionStatus('Connected', 'success');
+                    return true;
+                } catch (error) {
+                    console.error('NostrKV Connect initialization failed:', error);
+                    this.updateConnectionStatus('Connection Failed', 'error');
+                    throw error;
+                }
+            }
+            
+            parseConnectionString(uri) {
+                try {
+                    const url = new URL(uri);
+                    const serverPubkey = url.hostname;
+                    const params = url.searchParams;
+                    
+                    const secretParam = params.get('secret');
+                    
+                    // Ensure keys are proper hex format
+                    let clientSeckey = secretParam;
+                    let clientPubkey = window.NostrTools.getPublicKey(clientSeckey);
+                    
+                    // Log for debugging
+                    console.log('Server pubkey:', serverPubkey);
+                    console.log('Client seckey length:', clientSeckey.length);
+                    console.log('Client pubkey:', clientPubkey);
+                    
+                    this.config = {
+                        serverPubkey: serverPubkey,
+                        clientSeckey: clientSeckey,
+                        clientPubkey: clientPubkey,
+                        relays: [decodeURIComponent(params.get('relay'))],
+                        namespace: params.get('name') || 'betcha'
+                    };
+                    
+                    console.log('Connection string parsed successfully');
+                    console.log('Relay:', this.config.relays[0]);
+                    return this.config;
+                } catch (error) {
+                    throw new Error('Invalid connection string format: ' + error.message);
+                }
+            }
+            
+            async connectToRelays() {
+                if (!this.config) {
+                    throw new Error('No configuration. Parse connection string first.');
+                }
+                
+                this.updateConnectionStatus('Connecting...', 'warning');
+                this.pool = new window.NostrTools.SimplePool();
+                
+                const filters = [{
+                    kinds: [23195],
+                    '#p': [this.config.clientPubkey],
+                    since: Math.floor(Date.now() / 1000)
+                }];
+                
+                this.subscription = this.pool.subscribeMany(
+                    this.config.relays,
+                    filters,
+                    {
+                        onevent: (event) => this.handleResponse(event),
+                        oneose: () => {
+                            this.connected = true;
+                            console.log('NostrKV Connect established');
+                            this.updateConnectionStatus('Connected', 'success');
+                        },
+                        onclose: () => {
+                            this.connected = false;
+                            this.updateConnectionStatus('Disconnected', 'error');
+                        }
+                    }
+                );
+                
+                // Wait a moment for connection to establish
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            
+            async sendRequest(method, params = {}) {
+                if (!this.connected) {
+                    throw new Error('Not connected to NostrKV Connect');
+                }
+                
+                const requestId = 'req_' + Math.random().toString(36).substring(2, 15);
+                const request = { method, params, id: requestId };
+                
+                try {
+                    const requestJson = JSON.stringify(request);
+                    const encryptedContent = await window.NostrTools.nip04.encrypt(
+                        this.config.clientSeckey,
+                        this.config.serverPubkey,
+                        requestJson
+                    );
+                    
+                    const event = {
+                        kind: 23194,
+                        created_at: Math.floor(Date.now() / 1000),
+                        tags: [['p', this.config.serverPubkey]],
+                        content: encryptedContent,
+                        pubkey: this.config.clientPubkey
+                    };
+                    
+                    const signedEvent = window.NostrTools.finalizeEvent(event, this.config.clientSeckey);
+                    
+                    // Publish and wait for confirmation
+                    await this.pool.publish(this.config.relays, signedEvent);
+                    console.log('Request sent:', method, requestId);
+                    
+                    return new Promise((resolve, reject) => {
+                        this.pendingRequests.set(requestId, { resolve, reject });
+                        
+                        setTimeout(() => {
+                            if (this.pendingRequests.has(requestId)) {
+                                this.pendingRequests.delete(requestId);
+                                reject(new Error(`NostrKV request timeout for ${method}`));
+                            }
+                        }, 10000); // 10 second timeout
+                    });
+                } catch (error) {
+                    throw new Error(`Failed to send NostrKV request: ${error.message}`);
+                }
+            }
+            
+            async handleResponse(event) {
+                try {
+                    // Prevent duplicate event processing
+                    if (this.processedEvents.has(event.id)) {
+                        return;
+                    }
+                    this.processedEvents.add(event.id);
+                    
+                    // Check if this event is from the server
+                    if (event.pubkey !== this.config.serverPubkey) {
+                        return;
+                    }
+                    
+                    // Check if the event has valid content
+                    if (!event.content || typeof event.content !== 'string') {
+                        console.warn('Invalid event content received');
+                        return;
+                    }
+                    
+                    console.log(`Received response event ${event.id.substring(0, 8)}..., attempting to decrypt...`);
+                    
+                    let decryptedContent;
+                    
+                    // Try NIP-04 decryption (most compatible)
+                    try {
+                        decryptedContent = await window.NostrTools.nip04.decrypt(
+                            this.config.clientSeckey,
+                            this.config.serverPubkey,
+                            event.content
+                        );
+                        console.log('Response decrypted with NIP-04');
+                    } catch (nip04Error) {
+                        // Try NIP-44 if available
+                        if (window.NostrTools.nip44) {
+                            try {
+                                const conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(
+                                    this.config.clientSeckey,
+                                    this.config.serverPubkey
+                                );
+                                decryptedContent = window.NostrTools.nip44.v2.decrypt(
+                                    event.content,
+                                    conversationKey
+                                );
+                                console.log('Response decrypted with NIP-44');
+                            } catch (nip44Error) {
+                                console.error('Both decryption methods failed, skipping event');
+                                return;
+                            }
+                        } else {
+                            console.error('NIP-44 not available, skipping event');
+                            return;
+                        }
+                    }
+                    
+                    const response = JSON.parse(decryptedContent);
+                    const requestId = response.id;
+                    
+                    if (this.pendingRequests.has(requestId)) {
+                        const { resolve } = this.pendingRequests.get(requestId);
+                        this.pendingRequests.delete(requestId);
+                        console.log(`✅ Resolving request: ${requestId}`);
+                        resolve(response);
+                    } else {
+                        console.log(`⚠️ No pending request found for: ${requestId} (already resolved or timed out)`);
+                    }
+                } catch (error) {
+                    console.error('Failed to handle response:', error.message);
+                }
+            }
+            
+            updateConnectionStatus(message, type) {
+                const statusElement = document.getElementById('connection-status');
+                if (statusElement) {
+                    statusElement.textContent = `NostrKV: ${message}`;
+                    statusElement.className = `status ${type}`;
+                }
+            }
+            
+            // Game-specific methods
+            async getGameState(gameID) {
+                const response = await this.sendRequest('get', { key: `game_${gameID}` });
+                if (response.error) {
+                    throw new Error(response.error.message);
+                }
+                
+                if (response.result.value === null) {
+                    return null; // Game doesn't exist
+                }
+                
+                return JSON.parse(atob(response.result.value));
+            }
+            
+            async setGameState(gameID, gameState) {
+                const response = await this.sendRequest('set', {
+                    key: `game_${gameID}`,
+                    value: btoa(JSON.stringify(gameState))
+                });
+                
+                if (response.error) {
+                    throw new Error(response.error.message);
+                }
+                
+                return response.result;
+            }
+            
+            async getFlagHolder(gameID) {
+                const response = await this.sendRequest('get', { key: `flag_${gameID}` });
+                if (response.error) {
+                    throw new Error(response.error.message);
+                }
+                
+                if (!response.result.value) {
+                    return null; // No flag holder set
+                }
+                
+                try {
+                    // Parse the flag holder object
+                    return JSON.parse(atob(response.result.value));
+                } catch (error) {
+                    console.warn('Could not parse flag holder data, might be old format:', response.result.value);
+                    // Fallback for old format (just npub string)
+                    return {
+                        playerNpub: atob(response.result.value),
+                        playerName: 'Unknown',
+                        playerUUID: null,
+                        timestamp: Date.now()
+                    };
+                }
+            }
+            
+            async setFlagHolder(gameID, flagHolderObject) {
+                console.log('Setting flag holder in NostrKV:', flagHolderObject);
+                
+                const response = await this.sendRequest('set', {
+                    key: `flag_${gameID}`,
+                    value: btoa(JSON.stringify(flagHolderObject))
+                });
+                
+                if (response.error) {
+                    throw new Error(response.error.message);
+                }
+                
+                console.log('Flag holder set successfully in NostrKV');
+                return response.result;
+            }
+            
+            async getLeaderboard(gameID) {
+                const response = await this.sendRequest('get', { key: `leaderboard_${gameID}` });
+                if (response.error) {
+                    throw new Error(response.error.message);
+                }
+                
+                return response.result.value ? JSON.parse(atob(response.result.value)) : [];
+            }
+            
+            async updateLeaderboard(gameID, newHolder) {
+                let leaderboard = await this.getLeaderboard(gameID);
+                
+                // Add new holder to front, remove duplicates, limit to 10 entries
+                leaderboard = [newHolder, ...leaderboard.filter(npub => npub !== newHolder)].slice(0, 10);
+                
+                const response = await this.sendRequest('set', {
+                    key: `leaderboard_${gameID}`,
+                    value: btoa(JSON.stringify(leaderboard))
+                });
+                
+                if (response.error) {
+                    throw new Error(response.error.message);
+                }
+                
+                return response.result;
+            }
+        }
+
+        // Error Handler Class
+        class ErrorHandler {
+            static showError(message, duration = 5000) {
+                const errorContainer = document.getElementById('error-messages');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'status error';
+                errorDiv.textContent = message;
+                
+                errorContainer.appendChild(errorDiv);
+                
+                setTimeout(() => {
+                    if (errorDiv.parentNode) {
+                        errorDiv.parentNode.removeChild(errorDiv);
+                    }
+                }, duration);
+            }
+            
+            static showSuccess(message, duration = 3000) {
+                const errorContainer = document.getElementById('error-messages');
+                const successDiv = document.createElement('div');
+                successDiv.className = 'status success';
+                successDiv.textContent = message;
+                
+                errorContainer.appendChild(successDiv);
+                
+                setTimeout(() => {
+                    if (successDiv.parentNode) {
+                        successDiv.parentNode.removeChild(successDiv);
+                    }
+                }, duration);
+            }
+            
+            static handleNostrKVError(error) {
+                console.error('NostrKV Error:', error);
+                
+                if (error.message.includes('timeout')) {
+                    this.showError('Connection timeout - please try again');
+                } else if (error.message.includes('not connected')) {
+                    this.showError('Lost connection - reconnecting...');
+                } else {
+                    this.showError(`Error: ${error.message}`);
+                }
+            }
+        }
+
+        // Global application state
+        let screenManager;
+        let nostrKVClient;
+
+        // Initialize application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('Betcha app starting...');
+            
+            try {
+                // Initialize screen manager first
+                screenManager = new ScreenManager();
+                
+                // Initialize NostrKV Connect in parallel
+                nostrKVClient = new BetchaNostrKVClient();
+                
+                // Don't await - let it connect in background while UI loads
+                nostrKVClient.initialize().then(() => {
+                    console.log('🎉 NostrKV Connect ready!');
+                    ErrorHandler.showSuccess('Connected to NostrKV!');
+                    
+                    // If we're on a game page and haven't loaded state yet, try now
+                    if (screenManager.gameID && !screenManager.currentGameState) {
+                        console.log('🔄 NostrKV ready, reloading game state...');
+                        screenManager.loadGameState();
+                    }
+                }).catch((error) => {
+                    console.error('NostrKV initialization failed:', error);
+                    ErrorHandler.showError('NostrKV connection failed');
+                });
+                
+                // Set up global error handling
+                window.addEventListener('unhandledrejection', function(event) {
+                    console.error('Unhandled promise rejection:', event.reason);
+                    // Filter out common timeout errors that don't need user notification
+                    if (event.reason?.message && (
+                        event.reason.message.includes('publish timed out') ||
+                        event.reason.message.includes('timeout') ||
+                        event.reason.message.includes('Rate limit exceeded')
+                    )) {
+                        console.log('Suppressing timeout/rate limit error from user notification');
+                    } else {
+                        ErrorHandler.handleNostrKVError(event.reason);
+                    }
+                });
+                
+                console.log('Betcha app initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize Betcha app:', error);
+                ErrorHandler.showError('Failed to initialize - please refresh page');
+            }
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (nostrKVClient && nostrKVClient.connected && nostrKVClient.pool) {
+                nostrKVClient.pool.close(nostrKVClient.config.relays);
+            }
+        });
+
+        // Test functions for debugging
+        function testFlagCapture() {
+            console.log('🧪 Manual flag capture test');
+            if (screenManager) {
+                screenManager.handleFlagCapture();
+            } else {
+                console.error('screenManager not available');
+            }
+        }
+        
+        async function testNostrKV() {
+            try {
+                // Test set operation
+                await nostrKVClient.setGameState('test123', {
+                    gameID: 'test123',
+                    state: 'open',
+                    admin: screenManager.userUUID,
+                    players: []
+                });
+                console.log('✅ Set game state successful');
+                
+                // Test get operation
+                const gameState = await nostrKVClient.getGameState('test123');
+                console.log('✅ Get game state successful:', gameState);
+                
+                // Test flag operations
+                await nostrKVClient.setFlagHolder('test123', 'npub1test...');
+                const flagHolder = await nostrKVClient.getFlagHolder('test123');
+                console.log('✅ Flag operations successful:', flagHolder);
+                
+            } catch (error) {
+                console.error('❌ NostrKV test failed:', error);
+            }
+        }
+    </script>
+</body>
+</html>

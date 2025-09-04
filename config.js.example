@@ -1,0 +1,12 @@
+// Betcha Game Configuration Template
+// 
+// Instructions:
+// 1. Copy this file to config.js
+// 2. Replace the placeholder connection string with your actual NostrKV Connect connection string
+// 3. The config.js file will be ignored by Git to keep your secrets safe
+
+window.BetchaConfig = {
+    // Replace this with your actual NostrKV Connect connection string
+    // Format: nostr+kvconnect://SERVER_PUBKEY?relay=RELAY_URL&secret=CLIENT_SECRET&cmds=...
+    nostrKVConnectionString: "nostr+kvconnect://YOUR_SERVER_PUBKEY?relay=wss%3A%2F%2Fyour.relay.com&secret=YOUR_CLIENT_SECRET&cmds=get_info%2Cget%2Cset%2Cdel%2Cexists%2Cmget%2Cexpire%2Cttl&mps=60&bps=1048576&maxkey=256&maxval=65536&mget_max=16&name=new"
+};
