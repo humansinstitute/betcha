@@ -1018,16 +1018,16 @@
                 this.userUUID = this.getOrCreateUUID();
                 this.isAdmin = false;
                 this.gameStatePoller = null;
-                this.pollingInterval = 2000; // Poll every 2 seconds
+                this.pollingInterval = 1500; // Poll every 1.5 seconds
                 this.currentGameState = null;
                 
                 // Gameplay-specific properties
                 this.gameplayPoller = null;
-                this.gameplayPollingInterval = 4000; // Poll every 4 seconds during gameplay (further reduced to prevent rate limits)
+                this.gameplayPollingInterval = 1500; // Poll every 1.5 seconds during gameplay for faster updates
                 this.lastCaptureAttempt = 0;
-                this.captureAttemptCooldown = 1000; // 1 second cooldown between attempts
+                this.captureAttemptCooldown = 750; // Reduced to 750ms cooldown between attempts
                 this.lastPollTime = 0;
-                this.minPollInterval = 3000; // Minimum 3 seconds between any polls (increased to prevent rate limits)
+                this.minPollInterval = 1500; // Reduced minimum poll interval to match gameplay
                 this.currentFlagHolder = null;
                 this.currentLeaderboard = [];
                 this.gameTimer = null;
@@ -2090,15 +2090,24 @@
                         return;
                     }
                     
-                    // Get current flag holder from dedicated key
-                    try {
-                        const flagHolder = await nostrKVClient.getFlagHolder(this.gameID);
-                        console.log('Current flag holder from polling:', flagHolder);
-                        this.currentFlagHolder = flagHolder;
-                    } catch (error) {
-                        console.warn('Could not get flag holder:', error);
-                        this.currentFlagHolder = null;
+                    // Get current flag holder from dedicated key with retry
+                    let flagHolder = null;
+                    for (let attempt = 1; attempt <= 2; attempt++) {
+                        try {
+                            flagHolder = await nostrKVClient.getFlagHolder(this.gameID);
+                            console.log(`🏴 Flag holder from polling (attempt ${attempt}):`, flagHolder);
+                            break; // Success, exit retry loop
+                        } catch (error) {
+                            console.warn(`Could not get flag holder (attempt ${attempt}):`, error);
+                            if (attempt === 2) {
+                                console.error('Failed to get flag holder after 2 attempts');
+                            } else {
+                                // Short delay before retry
+                                await new Promise(resolve => setTimeout(resolve, 200));
+                            }
+                        }
                     }
+                    this.currentFlagHolder = flagHolder;
                     
                     // Update gameplay UI with flag holder info
                     this.updateGameplayUI(gameState);
@@ -2460,6 +2469,11 @@
                     // Update UI immediately
                     this.updateGameplayUI(gameState);
                     
+                    // Trigger immediate state refresh for other players
+                    setTimeout(() => {
+                        this.pollGameplayState();
+                    }, 100);
+                    
                     ErrorHandler.showSuccess(`🏴 Flag captured by ${currentPlayer.name}!`);
                     
                 } catch (error) {
@@ -2513,9 +2527,29 @@
                 // Update flag holder display using the dedicated flag holder data
                 const flagHolderElement = document.getElementById('current-flag-holder');
                 if (flagHolderElement) {
-                    const holderName = this.currentFlagHolder ? this.currentFlagHolder.playerName : 'None';
-                    flagHolderElement.textContent = holderName;
-                    console.log('Updated flag holder display to:', holderName);
+                    let holderName = 'None';
+                    let holderInfo = '';
+                    
+                    if (this.currentFlagHolder) {
+                        holderName = this.currentFlagHolder.playerName;
+                        const timeSince = Date.now() - this.currentFlagHolder.timestamp;
+                        const timeText = timeSince < 60000 ? 
+                            `${Math.floor(timeSince / 1000)}s ago` : 
+                            `${Math.floor(timeSince / 60000)}m ago`;
+                        holderInfo = ` (captured ${timeText})`;
+                    }
+                    
+                    flagHolderElement.textContent = holderName + holderInfo;
+                    console.log('🏴 Updated flag holder display to:', holderName, '- Full data:', this.currentFlagHolder);
+                    
+                    // Make the current flag holder display more prominent
+                    if (this.currentFlagHolder) {
+                        flagHolderElement.style.fontWeight = 'bold';
+                        flagHolderElement.style.color = '#28a745';
+                    } else {
+                        flagHolderElement.style.fontWeight = 'normal';
+                        flagHolderElement.style.color = '#6c757d';
+                    }
                 }
                 
                 // Update leaderboard to show current + 2 previous holders
@@ -2581,17 +2615,29 @@
                     
                     if (!gameState || gameState.state !== 'completed') {
                         console.log('🏁 Game state not completed, fetching latest from NostrKV...');
-                        // If state isn't completed yet, try to get latest state
-                        gameState = await nostrKVClient.getGameState(this.gameID);
-                        console.log('🏁 Fetched game state:', gameState);
+                        try {
+                            // If state isn't completed yet, try to get latest state
+                            const latestState = await nostrKVClient.getGameState(this.gameID);
+                            if (latestState) {
+                                gameState = latestState;
+                                console.log('🏁 Fetched latest game state:', gameState);
+                            }
+                        } catch (error) {
+                            console.log('🏁 Failed to fetch latest state, using current state as fallback:', error.message);
+                            // Use the current state we have - better than nothing
+                        }
                     }
                     
                     if (!gameState) {
                         console.error('🏁 ❌ No game state available for results');
-                        // Force display with error state
-                        document.getElementById('final-winner').textContent = 'Error: No game data';
-                        document.getElementById('prize-status').textContent = 'Game data error';
-                        document.getElementById('prize-status').className = 'prize-error';
+                        // Force display with user-friendly error state
+                        const winnerEl = document.getElementById('final-winner');
+                        const prizeEl = document.getElementById('prize-status');
+                        if (winnerEl) winnerEl.textContent = 'Game ended - results unavailable';
+                        if (prizeEl) {
+                            prizeEl.textContent = 'Backend connection lost. Try refreshing the page.';
+                            prizeEl.className = 'prize-error';
+                        }
                         return;
                     }
                     
@@ -2749,10 +2795,10 @@
                     const prizeElement = document.getElementById('prize-status');
                     
                     if (winnerElement) {
-                        winnerElement.textContent = 'Error loading results - check console';
+                        winnerElement.textContent = 'Game ended - results temporarily unavailable';
                     }
                     if (prizeElement) {
-                        prizeElement.textContent = 'System error occurred';
+                        prizeElement.textContent = 'Backend temporarily unavailable. Try refreshing to see results.';
                         prizeElement.className = 'prize-error';
                     }
                 }
